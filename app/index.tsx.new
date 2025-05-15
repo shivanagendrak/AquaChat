@@ -1,0 +1,32 @@
+import { Feather, FontAwesome6, MaterialIcons } from '@expo/vector-icons';
+import React, { useState, useEffect } from 'react';
+import {
+    Dimensions,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
+} from "react-native";
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, {
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming
+} from 'react-native-reanimated';
+
+// Import our components
+import DimOverlay from './components/DimOverlay';
+import EdgeDragDetector from './components/EdgeDragDetector';
+import SettingsView from './components/SettingsView';
+import SideMenu from './components/SideMenu';
+
+// Get screen dimensions
+const { width } = Dimensions.get('window');
+const MENU_WIDTH = width * 0.75; // Menu width is 75% of screen width
