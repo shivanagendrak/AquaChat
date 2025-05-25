@@ -176,22 +176,6 @@ const MenuPanel = ({ isOpen, onClose, slideAnim }: {
   const { colors } = useTheme();
   const screenWidth = Dimensions.get('window').width;
   const menuWidth = screenWidth * 0.75;
-  const [isVisible, setIsVisible] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsVisible(true);
-      setIsAnimating(true);
-    } else {
-      setIsAnimating(false);
-      // Wait for animation to complete before hiding
-      const timer = setTimeout(() => {
-        setIsVisible(false);
-      }, 250); // Match with animation duration
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
 
   const translateX = slideAnim.interpolate({
     inputRange: [0, 1],
@@ -203,49 +187,33 @@ const MenuPanel = ({ isOpen, onClose, slideAnim }: {
     outputRange: [0, 0.5],
   });
 
-  if (!isVisible && !isAnimating) return null;
-
   return (
     <>
       <Animated.View
         pointerEvents={isOpen ? 'auto' : 'none'}
-        style={[
-          styles.backdrop,
-          {
-            opacity: backdropOpacity,
-            backgroundColor: '#000',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 1000,
-          },
-        ]}
+        style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 1000,
+          backgroundColor: '#000',
+          opacity: backdropOpacity,
+        }}
         onTouchEnd={onClose}
       />
       <Animated.View
-        style={[
-          styles.menuPanel,
-          {
-            width: menuWidth,
-            transform: [{ translateX }],
-            backgroundColor: colors.background,
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            bottom: 0,
-            zIndex: 1001,
-            shadowColor: '#000',
-            shadowOffset: {
-              width: 2,
-              height: 0,
-            },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
-            elevation: 5,
-          },
-        ]}
+        style={{
+          position: 'absolute',
+          top: 0, left: 0, bottom: 0,
+          width: menuWidth,
+          zIndex: 1001,
+          backgroundColor: colors.background,
+          transform: [{ translateX }],
+          shadowColor: '#000',
+          shadowOffset: { width: 2, height: 0 },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
+          elevation: 5,
+        }}
       >
         <SafeAreaView style={styles.menuContent}>
           <View style={styles.menuHeader}>
@@ -1498,10 +1466,15 @@ const styles = StyleSheet.create({
   userMessage: {
     alignSelf: 'flex-end',
     marginRight: 0,
-    paddingRight: 8,
-    maxWidth: '100%',
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingRight: 12,
+    paddingLeft: 12,
+    maxWidth: '80%',
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderRadius: 22,
+    backgroundColor: '#0066CC',
+    color: '#fff',
+    marginTop: 16,
   },
   botMessage: {
     alignSelf: 'flex-start',
