@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import Markdown from 'react-native-markdown-display';
 import { ThemeProvider, useTheme } from "../components/theme";
 
@@ -194,6 +194,53 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
   const screenWidth = Dimensions.get('window').width;
   const menuWidth = screenWidth * 0.75;
 
+  const [search, setSearch] = React.useState('');
+  const filteredChats = chats.filter(chat =>
+    chat.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Dynamic storage size calculation
+  const [storageSize, setStorageSize] = React.useState('0 KB');
+  const [storageBytes, setStorageBytes] = React.useState(0);
+  React.useEffect(() => {
+    const calcStorageSize = async () => {
+      try {
+        const chatsStr = await AsyncStorage.getItem('chats');
+        if (!chatsStr) {
+          setStorageSize('0 KB');
+          setStorageBytes(0);
+          return;
+        }
+        // Calculate byte length
+        const bytes = new TextEncoder().encode(chatsStr).length;
+        setStorageBytes(bytes);
+        let size = '';
+        if (bytes < 1024) size = `${bytes} B`;
+        else if (bytes < 1024 * 1024) size = `${(bytes / 1024).toFixed(2)} KB`;
+        else if (bytes < 1024 * 1024 * 1024) size = `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        else size = `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+        setStorageSize(size);
+      } catch (e) {
+        setStorageSize('?');
+        setStorageBytes(0);
+      }
+    };
+    calcStorageSize();
+  }, [isOpen, chats]);
+
+  const appVersion = '1.0.1';
+
+  const handleDeleteAllChats = () => {
+    if (window.confirm && typeof window.confirm === 'function') {
+      if (!window.confirm('Are you sure you want to delete all chats? This cannot be undone.')) return;
+    }
+    chats.forEach(chat => deleteChat(chat.id));
+  };
+
+  const openUrl = (url: string) => {
+    Linking.openURL(url);
+  };
+
   const translateX = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [-menuWidth, 0],
@@ -240,46 +287,96 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
           elevation: 5,
         }}
       >
-        <SafeAreaView style={styles.menuContent}>
-          <View style={styles.menuHeader}>
-            <Text style={[styles.menuTitle, { color: colors.text }]}>Chats</Text>
-          </View>
-          <FlatList
-            data={chats}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.menuItem,
-                  currentChatId === item.id && { backgroundColor: colors.inputBackground }
-                ]}
-                onPress={() => handleChatPress(item.id)}
-                onLongPress={() => setShowDeleteForId(showDeleteForId === item.id ? null : item.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.menuItemContent}>
-                  <Text 
-                    style={[
-                      styles.menuItemText, 
-                      { color: colors.text },
-                      currentChatId === item.id && { fontWeight: '600' }
-                    ]} 
-                    numberOfLines={1}
-                  >
-                    {item.title}
-                  </Text>
-                  {showDeleteForId === item.id && (
-                    <TouchableOpacity 
-                      onPress={() => deleteChat(item.id)} 
-                      style={styles.deleteButton}
+        <SafeAreaView style={[styles.menuContent, { flex: 1 }]}>
+          <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search chats..."
+                placeholderTextColor={colors.placeholderText}
+                style={{
+                  backgroundColor: colors.inputBackground,
+                  color: colors.inputText,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  fontSize: 16,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  marginBottom: 8,
+                }}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+              />
+            </View>
+            <FlatList
+              data={filteredChats}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    currentChatId === item.id && { backgroundColor: colors.inputBackground }
+                  ]}
+                  onPress={() => handleChatPress(item.id)}
+                  onLongPress={() => setShowDeleteForId(showDeleteForId === item.id ? null : item.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuItemContent}>
+                    <Text 
+                      style={[
+                        styles.menuItemText, 
+                        { color: colors.text },
+                        currentChatId === item.id && { fontWeight: '600' }
+                      ]} 
+                      numberOfLines={1}
                     >
-                      <Ionicons name="trash-outline" size={20} color={colors.text} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </TouchableOpacity>
+                      {item.title}
+                    </Text>
+                    {showDeleteForId === item.id && (
+                      <TouchableOpacity 
+                        onPress={() => deleteChat(item.id)} 
+                        style={styles.deleteButton}
+                      >
+                        <Ionicons name="trash-outline" size={20} color={colors.text} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+          {/* Footer section */}
+          <View style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 16, backgroundColor: colors.background }}>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 4, paddingVertical: 6 }}
+              onPress={handleDeleteAllChats}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#d32f2f', fontWeight: '700', fontSize: 17, textAlign: 'center' }}>Delete all chats </Text>
+                <Text style={{ color: colors.placeholderText, fontWeight: '500', fontSize: 15, textAlign: 'center' }}>{storageSize}</Text>
+              </View>
+            </TouchableOpacity>
+            {storageBytes > 5 * 1024 * 1024 * 1024 && (
+              <Text style={{ color: '#d32f2f', fontSize: 14, marginBottom: 12, marginTop: 2 }}>
+                Warning! By deleting all chats, conversations will be lost and cannot be recovered!
+              </Text>
             )}
-          />
+            <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 12 }} />
+            <Text style={{ color: colors.placeholderText, fontSize: 14, marginBottom: 6 }}>
+              <Text>AquaChat - Version {appVersion}</Text>
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8 }}>
+              <TouchableOpacity onPress={() => openUrl('https://kurma.ai/term-conditions')}>
+                <Text style={{ color: colors.placeholderText, fontSize: 14, textDecorationLine: 'underline' }}>Terms of use</Text>
+              </TouchableOpacity>
+              <Text style={{ color: colors.placeholderText, fontSize: 14, marginHorizontal: 6 }}>|</Text>
+              <TouchableOpacity onPress={() => openUrl('https://kurma.ai/privacy-policy')}>
+                <Text style={{ color: colors.placeholderText, fontSize: 14, textDecorationLine: 'underline' }}>Privacy policy</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </SafeAreaView>
       </Animated.View>
     </>
