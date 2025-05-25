@@ -5,6 +5,7 @@ import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import Markdown from 'react-native-markdown-display';
+import SplashScreen from "../components/SplashScreen";
 import { ThemeProvider, useTheme } from "../components/theme";
 
 interface Message {
@@ -1452,10 +1453,9 @@ function AppContent() {
                     {/* Copy Icon */}
                     <Pressable
                       onPress={() => handleCopy(item.text)}
-                      style={({ pressed, hovered }) => ([
+                      style={({ pressed }) => ([
                         styles.actionIcon,
-                        pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : {},
-                        Platform.OS === 'web' && hovered ? { opacity: 0.8, transform: [{ scale: 1.15 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                        pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
                       ])}
                     >
                       <Ionicons name="copy-outline" size={18} color={colors.text} />
@@ -1464,10 +1464,9 @@ function AppContent() {
                     {!item.text.startsWith('Error:') && (
                       <Pressable
                         onPress={() => handleRetry(item)}
-                        style={({ pressed, hovered }) => ([
+                        style={({ pressed }) => ([
                           styles.actionIcon,
-                          pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : {},
-                          Platform.OS === 'web' && hovered ? { opacity: 0.8, transform: [{ scale: 1.15 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                          pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
                         ])}
                       >
                         <Ionicons name="refresh-outline" size={18} color={colors.text} />
@@ -1476,10 +1475,9 @@ function AppContent() {
                     {/* Text-to-Speech Icon */}
                     <Pressable
                       onPress={() => handleSpeak(item.text)}
-                      style={({ pressed, hovered }) => ([
+                      style={({ pressed }) => ([
                         styles.actionIcon,
-                        pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : {},
-                        Platform.OS === 'web' && hovered ? { opacity: 0.8, transform: [{ scale: 1.15 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                        pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
                       ])}
                     >
                       <Ionicons 
@@ -1836,6 +1834,17 @@ function AppContent() {
 }
 
 export default function Index() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2000); // Show splash for 2 seconds
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showSplash) {
+    return <SplashScreen />;
+  }
+
   return (
     <ThemeProvider>
       <AppContent />
