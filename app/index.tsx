@@ -313,6 +313,7 @@ function AppContent() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [showDeleteForId, setShowDeleteForId] = useState<string | null>(null);
+  const [headerTitle, setHeaderTitle] = useState('New Chat');
 
   const headerStyles = StyleSheet.create({
     header: {
@@ -1409,6 +1410,35 @@ function AppContent() {
     }
   };
 
+  // Add useEffect to update header title whenever relevant state changes
+  useEffect(() => {
+    const updateHeaderTitle = () => {
+      if (!currentChatId) {
+        setHeaderTitle('New Chat');
+        return;
+      }
+
+      const currentChat = chats.find(c => c.id === currentChatId);
+      if (!currentChat) {
+        setHeaderTitle('New Chat');
+        return;
+      }
+
+      // Find the first user message
+      const firstUserMessage = currentChat.messages.find(m => m.isUser);
+      if (firstUserMessage) {
+        const title = firstUserMessage.text.length > 30 
+          ? firstUserMessage.text.slice(0, 30) + '...'
+          : firstUserMessage.text;
+        setHeaderTitle(title);
+      } else {
+        setHeaderTitle(currentChat.title || 'New Chat');
+      }
+    };
+
+    updateHeaderTitle();
+  }, [currentChatId, chats, messages]); // Update when any of these change
+
   // Update the updateCurrentChat function
   const updateCurrentChat = (newMessages: Message[]) => {
     if (!currentChatId) return;
@@ -1466,6 +1496,7 @@ function AppContent() {
     setMessages([]);
     setText('');
     setIsMenuOpen(false);
+    setHeaderTitle('New Chat'); // Explicitly set header title for new chat
   };
 
   // Update the deleteChat function
@@ -1531,16 +1562,26 @@ function AppContent() {
           <TouchableOpacity style={headerStyles.menuButton} onPress={toggleMenu}>
             <CustomMenuIcon color={colors.text} />
           </TouchableOpacity>
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>
-              {currentChatId ? chats.find(c => c.id === currentChatId)?.title || 'New Chat' : 'New Chat'}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 }}>
+            <Text 
+              style={{ 
+                color: colors.text, 
+                fontSize: 18, 
+                fontWeight: '600',
+                textAlign: 'center',
+                maxWidth: '100%'
+              }}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {headerTitle}
             </Text>
           </View>
           <TouchableOpacity 
             style={headerStyles.noteButton} 
             onPress={() => {
               createNewChat();
-              setIsMenuOpen(false); // Close menu if it's open
+              setIsMenuOpen(false);
             }}
           >
             <SimpleLineIcons name="note" size={18} color={colors.text} />
