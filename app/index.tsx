@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Easing, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { Animated, Dimensions, Easing, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import Markdown from 'react-native-markdown-display';
 import { ThemeProvider, useTheme } from "../components/theme";
 
@@ -204,6 +204,14 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
     outputRange: [0, 0.5],
   });
 
+  const handleChatPress = (chatId: string) => {
+    if (showDeleteForId === chatId) {
+      return;
+    }
+    onSwitchChat(chatId);
+    onClose();
+  };
+
   return (
     <>
       <Animated.View
@@ -241,16 +249,34 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.menuItem, currentChatId === item.id && { backgroundColor: colors.inputBackground, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
-                onPress={() => setShowDeleteForId(showDeleteForId === item.id ? null : item.id)}
+                style={[
+                  styles.menuItem,
+                  currentChatId === item.id && { backgroundColor: colors.inputBackground }
+                ]}
+                onPress={() => handleChatPress(item.id)}
+                onLongPress={() => setShowDeleteForId(showDeleteForId === item.id ? null : item.id)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.menuItemText, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-                {showDeleteForId === item.id && (
-                  <TouchableOpacity onPress={() => deleteChat(item.id)} style={{ marginLeft: 12, padding: 4 }}>
-                    <Ionicons name="trash-outline" size={20} color={colors.text} />
-                  </TouchableOpacity>
-                )}
+                <View style={styles.menuItemContent}>
+                  <Text 
+                    style={[
+                      styles.menuItemText, 
+                      { color: colors.text },
+                      currentChatId === item.id && { fontWeight: '600' }
+                    ]} 
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </Text>
+                  {showDeleteForId === item.id && (
+                    <TouchableOpacity 
+                      onPress={() => deleteChat(item.id)} 
+                      style={styles.deleteButton}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={colors.text} />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </TouchableOpacity>
             )}
           />
@@ -258,6 +284,18 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
       </Animated.View>
     </>
   );
+};
+
+// Add this utility function at the top level
+const saveChatsToStorage = async (chatsToSave: Chat[]) => {
+  try {
+    // Sort chats by updatedAt before saving
+    const sortedChats = [...chatsToSave].sort((a, b) => b.updatedAt - a.updatedAt);
+    await AsyncStorage.setItem('chats', JSON.stringify(sortedChats));
+    console.log('Chats saved successfully:', sortedChats.length);
+  } catch (error) {
+    console.error('Error saving chats to storage:', error);
+  }
 };
 
 function AppContent() {
@@ -1324,40 +1362,91 @@ function AppContent() {
   }, [messages]);
 
   // Load chats from storage on mount
-  useEffect(() => {
-    loadChats();
-  }, []);
-
-  // Save chats whenever they change
-  useEffect(() => {
-    saveChats();
-  }, [chats]);
-
   const loadChats = async () => {
     try {
       const savedChats = await AsyncStorage.getItem('chats');
+      console.log('Loading saved chats...');
+      
       if (savedChats) {
         const parsedChats = JSON.parse(savedChats);
-        setChats(parsedChats);
-        if (parsedChats.length > 0) {
-          setCurrentChatId(parsedChats[0].id);
-          setMessages(parsedChats[0].messages);
+        // Validate chat structure
+        const validChats = parsedChats.filter((chat: any) => {
+          const isValid = chat && 
+            typeof chat.id === 'string' && 
+            typeof chat.title === 'string' && 
+            Array.isArray(chat.messages) &&
+            typeof chat.createdAt === 'number' &&
+            typeof chat.updatedAt === 'number';
+          
+          if (!isValid) {
+            console.warn('Invalid chat found:', chat);
+          }
+          return isValid;
+        });
+
+        console.log(`Loaded ${validChats.length} valid chats`);
+        
+        // Sort chats by updatedAt
+        const sortedChats = validChats.sort((a: Chat, b: Chat) => b.updatedAt - a.updatedAt);
+        setChats(sortedChats);
+        
+        if (sortedChats.length > 0) {
+          const mostRecentChat = sortedChats[0];
+          setCurrentChatId(mostRecentChat.id);
+          setMessages(mostRecentChat.messages || []);
         }
+      } else {
+        console.log('No saved chats found');
+        setChats([]);
+        setCurrentChatId(null);
+        setMessages([]);
       }
     } catch (error) {
       console.error('Error loading chats:', error);
+      setChats([]);
+      setCurrentChatId(null);
+      setMessages([]);
     }
   };
 
-  const saveChats = async () => {
-    try {
-      await AsyncStorage.setItem('chats', JSON.stringify(chats));
-    } catch (error) {
-      console.error('Error saving chats:', error);
-    }
+  // Update the updateCurrentChat function
+  const updateCurrentChat = (newMessages: Message[]) => {
+    if (!currentChatId) return;
+    
+    setChats(prevChats => {
+      const updatedChats = prevChats.map(chat => {
+        if (chat.id === currentChatId) {
+          const firstUserMessage = newMessages.find(m => m.isUser);
+          const title = firstUserMessage?.text
+            ? (firstUserMessage.text.slice(0, 30) + (firstUserMessage.text.length > 30 ? '...' : ''))
+            : chat.title || 'New Chat';
+          
+          const updatedChat = {
+            ...chat,
+            title,
+            messages: [...newMessages],
+            updatedAt: Date.now(),
+          };
+          
+          // Save immediately after updating a chat
+          saveChatsToStorage([...prevChats.filter(c => c.id !== currentChatId), updatedChat]);
+          
+          return updatedChat;
+        }
+        return chat;
+      });
+      
+      return updatedChats;
+    });
   };
 
+  // Update the createNewChat function
   const createNewChat = () => {
+    // Save current chat before creating new one
+    if (currentChatId) {
+      updateCurrentChat(messages);
+    }
+    
     const newChat: Chat = {
       id: Date.now().toString(),
       title: 'New Chat',
@@ -1365,41 +1454,27 @@ function AppContent() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    setChats(prev => [newChat, ...prev]);
+    
+    setChats(prev => {
+      const updatedChats = [newChat, ...prev];
+      // Save immediately after creating new chat
+      saveChatsToStorage(updatedChats);
+      return updatedChats;
+    });
+    
     setCurrentChatId(newChat.id);
     setMessages([]);
     setText('');
+    setIsMenuOpen(false);
   };
 
-  const switchChat = (chatId: string) => {
-    const chat = chats.find(c => c.id === chatId);
-    if (chat) {
-      setCurrentChatId(chatId);
-      setMessages(chat.messages);
-    }
-  };
-
-  const updateCurrentChat = (newMessages: Message[]) => {
-    setChats(prevChats => prevChats.map(chat => {
-      if (chat.id === currentChatId) {
-        const firstUserMessage = newMessages.find(m => m.isUser);
-        const title = firstUserMessage?.text
-          ? (firstUserMessage.text.slice(0, 30) + (firstUserMessage.text.length > 30 ? '...' : ''))
-          : 'New Chat';
-        return {
-          ...chat,
-          title,
-          messages: newMessages,
-          updatedAt: Date.now(),
-        };
-      }
-      return chat;
-    }));
-  };
-
+  // Update the deleteChat function
   const deleteChat = (chatId: string) => {
     setChats(prev => {
       const updated = prev.filter(chat => chat.id !== chatId);
+      // Save immediately after deleting a chat
+      saveChatsToStorage(updated);
+      
       // If the deleted chat is the current one, switch to another or clear
       if (currentChatId === chatId) {
         if (updated.length > 0) {
@@ -1410,10 +1485,32 @@ function AppContent() {
           setMessages([]);
         }
       }
+      
       return updated;
     });
     setShowDeleteForId(null);
   };
+
+  // Update the switchChat function
+  const switchChat = (chatId: string) => {
+    // Save current chat before switching
+    if (currentChatId) {
+      updateCurrentChat(messages);
+    }
+    
+    const chat = chats.find(c => c.id === chatId);
+    if (chat) {
+      setCurrentChatId(chatId);
+      setMessages(chat.messages);
+      setText('');
+      setIsMenuOpen(false);
+    }
+  };
+
+  // Add useEffect for initial load
+  useEffect(() => {
+    loadChats();
+  }, []);
 
   return (
     <>
@@ -1435,9 +1532,17 @@ function AppContent() {
             <CustomMenuIcon color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>New Chat</Text>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>
+              {currentChatId ? chats.find(c => c.id === currentChatId)?.title || 'New Chat' : 'New Chat'}
+            </Text>
           </View>
-          <TouchableOpacity style={headerStyles.noteButton} onPress={createNewChat}>
+          <TouchableOpacity 
+            style={headerStyles.noteButton} 
+            onPress={() => {
+              createNewChat();
+              setIsMenuOpen(false); // Close menu if it's open
+            }}
+          >
             <SimpleLineIcons name="note" size={18} color={colors.text} />
           </TouchableOpacity>
         </View>
@@ -1506,9 +1611,13 @@ function AppContent() {
                         </TouchableOpacity>
                       )}
                       {isLoading && (
-                        <View style={styles.submitButton}>
-                          <ActivityIndicator color={colors.text} />
-                        </View>
+                        <TouchableOpacity style={styles.submitButton} disabled>
+                          <Ionicons
+                            name="arrow-up-circle-outline"
+                            size={32}
+                            color={colors.placeholderText}
+                          />
+                        </TouchableOpacity>
                       )}
                       {text.trim().length === 0 && !isLoading && (
                         <TouchableOpacity 
@@ -1695,7 +1804,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   menuTitle: {
     fontSize: 20,
@@ -1712,10 +1821,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   menuItemText: {
     fontSize: 16,
+    flex: 1,
+  },
+  deleteButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  newChatButton: {
+    padding: 4,
+  },
+  menuItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 8,
   },
   mainContent: {
     position: 'absolute',
