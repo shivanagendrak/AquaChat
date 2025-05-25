@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import Markdown from 'react-native-markdown-display';
 import { ThemeProvider, useTheme } from "../components/theme";
 
@@ -296,6 +296,56 @@ const saveChatsToStorage = async (chatsToSave: Chat[]) => {
   } catch (error) {
     console.error('Error saving chats to storage:', error);
   }
+};
+
+// Add ChatPromptPanel component
+const ChatPromptPanel = ({ onSelect }: { onSelect: (q: string) => void }) => {
+  const { colors, theme } = useTheme();
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.background }}>
+      <Image
+        source={theme === 'dark' ? require('../assets/images/splash-icon-light.png') : require('../assets/images/splash-icon-dark.png')}
+        style={{ width: 200, height: 200, marginBottom: 0 }}
+        resizeMode="contain"
+      />
+      <Text style={{ fontSize: 26, fontWeight: '700', marginBottom: 8, color: colors.text, textAlign: 'center' }}>
+        Hi, I'm AquaChat.
+      </Text>
+      <Text style={{ fontSize: 18, color: colors.placeholderText, marginBottom: 28, textAlign: 'center' }}>
+        How can I help you today?
+      </Text>
+      <View style={{ width: '100%', maxWidth: 400 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+          <TouchableOpacity
+            style={{ flex: 1, marginRight: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
+            onPress={() => onSelect('Tips to improve fish health?')}
+          >
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>Tips to improve{Platform.OS === 'web' ? '\n' : ' '}fish health?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flex: 1, marginLeft: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
+            onPress={() => onSelect('How to set up a small fish farm?')}
+          >
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>How to set up a{Platform.OS === 'web' ? '\n' : ' '}small fish farm?</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <TouchableOpacity
+            style={{ flex: 1, marginRight: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
+            onPress={() => onSelect('Best practices for water quality?')}
+          >
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>Best practices for{Platform.OS === 'web' ? '\n' : ' '}water quality?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flex: 1, marginLeft: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
+            onPress={() => onSelect('What is the ideal pH level for fish?')}
+          >
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>What is the ideal{Platform.OS === 'web' ? '\n' : ' '}pH level for fish?</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
 };
 
 function AppContent() {
@@ -1601,24 +1651,28 @@ function AppContent() {
                 />
                 <View style={[styles.mainContainer, { backgroundColor: colors.background }]}> 
                   <View style={{ flex: 1, minHeight: 0 }}>
-                    <FlatList
-                      ref={flatListRef}
-                      data={messages}
-                      renderItem={({ item, index }) => renderMessage({ item, index })}
-                      keyExtractor={item => item.id}
-                      contentContainerStyle={{
-                        flexGrow: 1,
-                        paddingHorizontal: 16,
-                        paddingVertical: 8,
-                        paddingBottom: 48,
-                      }}
-                      onContentSizeChange={scrollToBottom}
-                      onLayout={scrollToBottom}
-                      maintainVisibleContentPosition={{
-                        minIndexForVisible: 0,
-                        autoscrollToTopThreshold: 10
-                      }}
-                    />
+                    {messages.length === 0 ? (
+                      <ChatPromptPanel onSelect={setText} />
+                    ) : (
+                      <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        renderItem={({ item, index }) => renderMessage({ item, index })}
+                        keyExtractor={item => item.id}
+                        contentContainerStyle={{
+                          flexGrow: 1,
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          paddingBottom: 48,
+                        }}
+                        onContentSizeChange={scrollToBottom}
+                        onLayout={scrollToBottom}
+                        maintainVisibleContentPosition={{
+                          minIndexForVisible: 0,
+                          autoscrollToTopThreshold: 10
+                        }}
+                      />
+                    )}
                   </View>
                   <View style={[styles.inputContainer, { backgroundColor: colors.background }]}> 
                     <View style={styles.inputWrapper}>
