@@ -1,4 +1,5 @@
 import { Ionicons, SimpleLineIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
@@ -15,6 +16,14 @@ interface Message {
 interface ContentPart {
   text?: string;
   [key: string]: any;
+}
+
+interface Chat {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 async function generateResponse(prompt: string): Promise<string> {
@@ -167,12 +176,20 @@ const CustomMenuIcon = ({ color }: { color: string }) => {
   );
 };
 
-// Add MenuPanel component before AppContent
-const MenuPanel = ({ isOpen, onClose, slideAnim }: { 
-  isOpen: boolean; 
-  onClose: () => void; 
+interface MenuPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
   slideAnim: Animated.Value;
-}) => {
+  chats: Chat[];
+  currentChatId: string | null;
+  onSwitchChat: (chatId: string) => void;
+  onNewChat: () => void;
+  showDeleteForId: string | null;
+  setShowDeleteForId: (id: string | null) => void;
+  deleteChat: (id: string) => void;
+}
+
+const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchChat, onNewChat, showDeleteForId, setShowDeleteForId, deleteChat }: MenuPanelProps) => {
   const { colors } = useTheme();
   const screenWidth = Dimensions.get('window').width;
   const menuWidth = screenWidth * 0.75;
@@ -217,25 +234,26 @@ const MenuPanel = ({ isOpen, onClose, slideAnim }: {
       >
         <SafeAreaView style={styles.menuContent}>
           <View style={styles.menuHeader}>
-            <Text style={[styles.menuTitle, { color: colors.text }]}>Menu</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
+            <Text style={[styles.menuTitle, { color: colors.text }]}>Chats</Text>
           </View>
-          <View style={styles.menuItems}>
-            <TouchableOpacity style={styles.menuItem}>
-              <Ionicons name="chatbubble-outline" size={20} color={colors.text} />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Chat</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <Ionicons name="settings-outline" size={20} color={colors.text} />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <Ionicons name="help-circle-outline" size={20} color={colors.text} />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Help</Text>
-            </TouchableOpacity>
-          </View>
+          <FlatList
+            data={chats}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.menuItem, currentChatId === item.id && { backgroundColor: colors.inputBackground, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                onPress={() => setShowDeleteForId(showDeleteForId === item.id ? null : item.id)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.menuItemText, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+                {showDeleteForId === item.id && (
+                  <TouchableOpacity onPress={() => deleteChat(item.id)} style={{ marginLeft: 12, padding: 4 }}>
+                    <Ionicons name="trash-outline" size={20} color={colors.text} />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            )}
+          />
         </SafeAreaView>
       </Animated.View>
     </>
@@ -254,6 +272,9 @@ function AppContent() {
   const flatListRef = useRef<FlatList>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [showDeleteForId, setShowDeleteForId] = useState<string | null>(null);
 
   const headerStyles = StyleSheet.create({
     header: {
@@ -261,7 +282,7 @@ function AppContent() {
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: 16,
-      paddingTop: Platform.OS === 'ios' ? 44 : 0,
+      paddingTop: Platform.OS === 'ios' ? 54 : 0,
       paddingBottom: 8,
       zIndex: 1000,
     },
@@ -331,81 +352,91 @@ function AppContent() {
 
   const handleSubmit = async () => {
     if (!text.trim() || isLoading) return;
-
     const userMessage: Message = {
       id: Date.now().toString(),
       text: text.trim(),
       isUser: true
     };
-
-    // Add a temporary loading message with ThinkingText
     const loadingMessage: Message = {
       id: 'loading-' + Date.now().toString(),
-      text: "thinking", // Special text to indicate we should show ThinkingText
+      text: "thinking",
       isUser: false
     };
-
-    setMessages(prev => [...prev, userMessage, loadingMessage]);
+    const newMessages = [...messages, userMessage, loadingMessage];
+    setMessages(newMessages);
+    updateCurrentChat(newMessages);
     setText("");
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await generateResponse(text.trim());
-      
       if (response.startsWith('Error:')) {
         setError(response);
-        // Replace loading message with error
-        setMessages(prev => prev.map(msg => 
-          msg.id === loadingMessage.id 
-            ? { ...msg, text: response }
-            : msg
-        ));
+        setMessages(prev => {
+          const updated = prev.map(msg =>
+            msg.id === loadingMessage.id
+              ? { ...msg, text: response }
+              : msg
+          );
+          updateCurrentChat(updated);
+          return updated;
+        });
       } else {
-        // Replace loading message with actual response
-        setMessages(prev => prev.map(msg => 
-          msg.id === loadingMessage.id 
-            ? { ...msg, text: '' }
-            : msg
-        ));
-        // Stream the response
+        setMessages(prev => {
+          const updated = prev.map(msg =>
+            msg.id === loadingMessage.id
+              ? { ...msg, text: '' }
+              : msg
+          );
+          updateCurrentChat(updated);
+          return updated;
+        });
+        // Streaming logic
         const words = response.split(/(\s+)/);
         let currentIndex = 0;
         let currentText = '';
         setIsStreaming(true);
-        
         const streamInterval = setInterval(() => {
           if (currentIndex < words.length) {
             currentText += words[currentIndex];
-            // Update the loading message with the current text
-            setMessages(prev => prev.map(msg => 
-              msg.id === loadingMessage.id 
-                ? { ...msg, text: currentText }
-                : msg
-            ));
+            setMessages(prev => {
+              const updated = prev.map(msg =>
+                msg.id === loadingMessage.id
+                  ? { ...msg, text: currentText }
+                  : msg
+              );
+              updateCurrentChat(updated);
+              return updated;
+            });
             currentIndex++;
           } else {
             clearInterval(streamInterval);
             setIsStreaming(false);
-            // Update the final message with the complete text
-            setMessages(prev => prev.map(msg => 
-              msg.id === loadingMessage.id 
-                ? { ...msg, text: response, id: Date.now().toString() }
-                : msg
-            ));
+            setMessages(prev => {
+              const updated = prev.map(msg =>
+                msg.id === loadingMessage.id
+                  ? { ...msg, text: response, id: Date.now().toString() }
+                  : msg
+              );
+              updateCurrentChat(updated);
+              return updated;
+            });
           }
         }, 30);
       }
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setError(errorMessage);
-      // Replace loading message with error
-      setMessages(prev => prev.map(msg => 
-        msg.id === loadingMessage.id 
-          ? { ...msg, text: errorMessage }
-          : msg
-      ));
+      setMessages(prev => {
+        const updated = prev.map(msg =>
+          msg.id === loadingMessage.id
+            ? { ...msg, text: errorMessage }
+            : msg
+        );
+        updateCurrentChat(updated);
+        return updated;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -427,64 +458,77 @@ function AppContent() {
             break;
           }
         }
-
         if (userMessageText) {
           setIsLoading(true);
           setError(null);
-
-          // First show loading message with ThinkingText
-          setMessages(prev => prev.map(msg => 
-            msg.id === item.id 
-              ? { ...msg, text: "thinking" } // Special text to indicate we should show ThinkingText
-              : msg
-          ));
-
+          setMessages(prev => {
+            const updated = prev.map(msg =>
+              msg.id === item.id
+                ? { ...msg, text: "thinking" }
+                : msg
+            );
+            updateCurrentChat(updated);
+            return updated;
+          });
           try {
             const response = await generateResponse(userMessageText);
-            
             if (response.startsWith('Error:')) {
               setError(response);
-              setMessages(prev => prev.map(msg => 
-                msg.id === item.id 
-                  ? { ...msg, text: response }
-                  : msg
-              ));
+              setMessages(prev => {
+                const updated = prev.map(msg =>
+                  msg.id === item.id
+                    ? { ...msg, text: response }
+                    : msg
+                );
+                updateCurrentChat(updated);
+                return updated;
+              });
             } else {
-              // Start streaming the response
+              // Streaming logic
               const words = response.split(/(\s+)/);
               let currentIndex = 0;
               let currentText = '';
               setIsStreaming(true);
-              
               const streamInterval = setInterval(() => {
                 if (currentIndex < words.length) {
                   currentText += words[currentIndex];
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === item.id 
-                      ? { ...msg, text: currentText }
-                      : msg
-                  ));
+                  setMessages(prev => {
+                    const updated = prev.map(msg =>
+                      msg.id === item.id
+                        ? { ...msg, text: currentText }
+                        : msg
+                    );
+                    updateCurrentChat(updated);
+                    return updated;
+                  });
                   currentIndex++;
                 } else {
                   clearInterval(streamInterval);
                   setIsStreaming(false);
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === item.id 
-                      ? { ...msg, text: response }
-                      : msg
-                  ));
+                  setMessages(prev => {
+                    const updated = prev.map(msg =>
+                      msg.id === item.id
+                        ? { ...msg, text: response }
+                        : msg
+                    );
+                    updateCurrentChat(updated);
+                    return updated;
+                  });
                 }
               }, 30);
             }
           } catch (error) {
-            console.error('Error in handleRetry:', error);
             const errorText = error instanceof Error ? error.message : "An unexpected error occurred";
             setError(errorText);
-            setMessages(prev => prev.map(msg => 
-              msg.id === item.id 
-                ? { ...msg, text: errorText }
-                : msg
-            ));
+            setMessages(prev => {
+              const updated = prev.map(msg =>
+                msg.id === item.id
+                  ? { ...msg, text: errorText }
+                  : msg
+              );
+              updateCurrentChat(updated);
+              return updated;
+            });
           } finally {
             setIsLoading(false);
           }
@@ -1279,120 +1323,212 @@ function AppContent() {
     scrollToBottom();
   }, [messages]);
 
+  // Load chats from storage on mount
+  useEffect(() => {
+    loadChats();
+  }, []);
+
+  // Save chats whenever they change
+  useEffect(() => {
+    saveChats();
+  }, [chats]);
+
+  const loadChats = async () => {
+    try {
+      const savedChats = await AsyncStorage.getItem('chats');
+      if (savedChats) {
+        const parsedChats = JSON.parse(savedChats);
+        setChats(parsedChats);
+        if (parsedChats.length > 0) {
+          setCurrentChatId(parsedChats[0].id);
+          setMessages(parsedChats[0].messages);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading chats:', error);
+    }
+  };
+
+  const saveChats = async () => {
+    try {
+      await AsyncStorage.setItem('chats', JSON.stringify(chats));
+    } catch (error) {
+      console.error('Error saving chats:', error);
+    }
+  };
+
+  const createNewChat = () => {
+    const newChat: Chat = {
+      id: Date.now().toString(),
+      title: 'New Chat',
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setChats(prev => [newChat, ...prev]);
+    setCurrentChatId(newChat.id);
+    setMessages([]);
+    setText('');
+  };
+
+  const switchChat = (chatId: string) => {
+    const chat = chats.find(c => c.id === chatId);
+    if (chat) {
+      setCurrentChatId(chatId);
+      setMessages(chat.messages);
+    }
+  };
+
+  const updateCurrentChat = (newMessages: Message[]) => {
+    setChats(prevChats => prevChats.map(chat => {
+      if (chat.id === currentChatId) {
+        const firstUserMessage = newMessages.find(m => m.isUser);
+        const title = firstUserMessage?.text
+          ? (firstUserMessage.text.slice(0, 30) + (firstUserMessage.text.length > 30 ? '...' : ''))
+          : 'New Chat';
+        return {
+          ...chat,
+          title,
+          messages: newMessages,
+          updatedAt: Date.now(),
+        };
+      }
+      return chat;
+    }));
+  };
+
+  const deleteChat = (chatId: string) => {
+    setChats(prev => {
+      const updated = prev.filter(chat => chat.id !== chatId);
+      // If the deleted chat is the current one, switch to another or clear
+      if (currentChatId === chatId) {
+        if (updated.length > 0) {
+          setCurrentChatId(updated[0].id);
+          setMessages(updated[0].messages);
+        } else {
+          setCurrentChatId(null);
+          setMessages([]);
+        }
+      }
+      return updated;
+    });
+    setShowDeleteForId(null);
+  };
+
   return (
     <>
-      <View style={[headerStyles.header, { backgroundColor: colors.background }]}>
-        <TouchableOpacity style={headerStyles.menuButton} onPress={toggleMenu}>
-          <CustomMenuIcon color={colors.text} />
-        </TouchableOpacity>
-        <View style={headerStyles.noteButton}>
-          <SimpleLineIcons 
-            name="note" 
-            size={18} 
-            color={colors.text} 
-          />
-        </View>
-      </View>
       <MenuPanel 
-        isOpen={isMenuOpen} 
-        onClose={toggleMenu} 
+        isOpen={isMenuOpen}
+        onClose={toggleMenu}
         slideAnim={slideAnim}
+        chats={chats}
+        currentChatId={currentChatId}
+        onSwitchChat={switchChat}
+        onNewChat={createNewChat}
+        showDeleteForId={showDeleteForId}
+        setShowDeleteForId={setShowDeleteForId}
+        deleteChat={deleteChat}
       />
-      <Animated.View 
-        style={[
-          styles.mainContent,
-          {
-            transform: [{ translateX: mainContentTranslateX }],
-            backgroundColor: colors.background,
-          }
-        ]}
-      >
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-          <StatusBar
-            barStyle={colors.background === '#fff' ? "dark-content" : "light-content"}
-            backgroundColor={colors.background}
-          />
-          <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
-            <View style={{ flex: 1, minHeight: 0 }}>
-              <FlatList
-                ref={flatListRef}
-                data={messages}
-                renderItem={({ item, index }) => renderMessage({ item, index })}
-                keyExtractor={item => item.id}
-                contentContainerStyle={{
-                  flexGrow: 1,
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  paddingBottom: 48,
-                }}
-                onContentSizeChange={scrollToBottom}
-                onLayout={scrollToBottom}
-                maintainVisibleContentPosition={{
-                  minIndexForVisible: 0,
-                  autoscrollToTopThreshold: 10
-                }}
-              />
-            </View>
-
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-            >
-              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          backgroundColor: colors.inputBackground,
-                          color: colors.inputText,
-                          paddingRight: 48,
-                        }
-                      ]}
-                      placeholder="Ask anything on Aquaculture"
-                      placeholderTextColor={colors.placeholderText}
-                      multiline
-                      value={text}
-                      onChangeText={setText}
-                      textAlignVertical="top"
-                      blurOnSubmit={false}
+      <Animated.View style={[styles.mainContent, { transform: [{ translateX: mainContentTranslateX }], backgroundColor: colors.background }]}>
+        <View style={[headerStyles.header, { backgroundColor: colors.background, marginBottom: 16 }]}> 
+          <TouchableOpacity style={headerStyles.menuButton} onPress={toggleMenu}>
+            <CustomMenuIcon color={colors.text} />
+          </TouchableOpacity>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>New Chat</Text>
+          </View>
+          <TouchableOpacity style={headerStyles.noteButton} onPress={createNewChat}>
+            <SimpleLineIcons name="note" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={{ flex: 1 }}>
+              <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
+                <StatusBar
+                  barStyle={colors.background === '#fff' ? "dark-content" : "light-content"}
+                  backgroundColor={colors.background}
+                />
+                <View style={[styles.mainContainer, { backgroundColor: colors.background }]}> 
+                  <View style={{ flex: 1, minHeight: 0 }}>
+                    <FlatList
+                      ref={flatListRef}
+                      data={messages}
+                      renderItem={({ item, index }) => renderMessage({ item, index })}
+                      keyExtractor={item => item.id}
+                      contentContainerStyle={{
+                        flexGrow: 1,
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        paddingBottom: 48,
+                      }}
+                      onContentSizeChange={scrollToBottom}
+                      onLayout={scrollToBottom}
+                      maintainVisibleContentPosition={{
+                        minIndexForVisible: 0,
+                        autoscrollToTopThreshold: 10
+                      }}
                     />
-                    {text.trim().length > 0 && !isLoading && (
-                      <TouchableOpacity 
-                        style={styles.submitButton}
-                        onPress={handleSubmit}
-                      >
-                        <Ionicons 
-                          name="arrow-up-circle-sharp" 
-                          size={32} 
-                          color={colors.text} 
-                        />
-                      </TouchableOpacity>
-                    )}
-                    {isLoading && (
-                      <View style={styles.submitButton}>
-                        <ActivityIndicator color={colors.text} />
-                      </View>
-                    )}
-                    {text.trim().length === 0 && !isLoading && (
-                      <TouchableOpacity 
-                        style={styles.submitButton}
-                        disabled={true}
-                      >
-                        <Ionicons 
-                          name="arrow-up-circle-outline" 
-                          size={32} 
-                          color={colors.placeholderText} 
-                        />
-                      </TouchableOpacity>
-                    )}
+                  </View>
+                  <View style={[styles.inputContainer, { backgroundColor: colors.background }]}> 
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          {
+                            backgroundColor: colors.inputBackground,
+                            color: colors.inputText,
+                            paddingRight: 48,
+                          }
+                        ]}
+                        placeholder="Ask anything on Aquaculture"
+                        placeholderTextColor={colors.placeholderText}
+                        multiline
+                        value={text}
+                        onChangeText={setText}
+                        textAlignVertical="top"
+                        blurOnSubmit={false}
+                      />
+                      {text.trim().length > 0 && !isLoading && (
+                        <TouchableOpacity 
+                          style={styles.submitButton}
+                          onPress={handleSubmit}
+                        >
+                          <Ionicons 
+                            name="arrow-up-circle-sharp" 
+                            size={32} 
+                            color={colors.text} 
+                          />
+                        </TouchableOpacity>
+                      )}
+                      {isLoading && (
+                        <View style={styles.submitButton}>
+                          <ActivityIndicator color={colors.text} />
+                        </View>
+                      )}
+                      {text.trim().length === 0 && !isLoading && (
+                        <TouchableOpacity 
+                          style={styles.submitButton}
+                          disabled={true}
+                        >
+                          <Ionicons 
+                            name="arrow-up-circle-outline" 
+                            size={32} 
+                            color={colors.placeholderText} 
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </View>
-              </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
-          </View>
-        </SafeAreaView>
+              </SafeAreaView>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Animated.View>
     </>
   );
