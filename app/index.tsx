@@ -1,6 +1,7 @@
 import { Ionicons, SimpleLineIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
@@ -1835,9 +1836,13 @@ function AppContent() {
 
 export default function Index() {
   const [showSplash, setShowSplash] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 2000); // Show splash for 2 seconds
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+      router.replace('/get-started');
+    }, 2000); // Show splash for 2 seconds
     return () => clearTimeout(timer);
   }, []);
 
