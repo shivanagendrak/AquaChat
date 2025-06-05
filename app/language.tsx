@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -43,9 +44,19 @@ const languageRows = [
 export default function LanguagePage() {
   const [selected, setSelected] = useState<string | null>(null);
 
-  const handleContinue = () => {
-    // You can store the selected language in async storage or context here
-    router.replace('/');
+  const handleContinue = async () => {
+    try {
+      // Store the selected language
+      await AsyncStorage.setItem('selectedLanguage', selected || 'en');
+      // Set the flag to indicate we're coming from language selection
+      await AsyncStorage.setItem('fromLanguage', 'true');
+      // Navigate to main screen
+      router.replace('/');
+    } catch (error) {
+      console.error('Error saving language preference:', error);
+      // Still try to navigate even if storage fails
+      router.replace('/');
+    }
   };
 
   return (

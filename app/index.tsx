@@ -1839,11 +1839,35 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-      router.replace('/get-started');
-    }, 2000); // Show splash for 2 seconds
-    return () => clearTimeout(timer);
+    const checkNavigation = async () => {
+      try {
+        // Check if we're coming from language selection
+        const fromLanguage = await AsyncStorage.getItem('fromLanguage');
+        if (fromLanguage === 'true') {
+          // Clear the flag and skip splash screen
+          await AsyncStorage.removeItem('fromLanguage');
+          setShowSplash(false);
+          return;
+        }
+        
+        // Otherwise show splash screen
+        const timer = setTimeout(() => {
+          setShowSplash(false);
+          router.replace('/get-started');
+        }, 2000);
+        return () => clearTimeout(timer);
+      } catch (error) {
+        console.error('Error checking navigation state:', error);
+        // Fallback to showing splash screen
+        const timer = setTimeout(() => {
+          setShowSplash(false);
+          router.replace('/get-started');
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    checkNavigation();
   }, []);
 
   if (showSplash) {
