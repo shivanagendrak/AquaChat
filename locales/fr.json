@@ -1,0 +1,22 @@
+{
+  "appName": "AquaChat",
+  "newChat": "Nouvelle Conversation",
+  "askAnything": "Posez vos questions sur l'Aquaculture",
+  "thinking": "réflexion",
+  "deleteAllChats": "Supprimer toutes les conversations",
+  "deleteAllChatsConfirm": "Êtes-vous sûr de vouloir supprimer toutes les conversations ? Cette action est irréversible.",
+  "deleteAllChatsWarning": "Attention ! En supprimant toutes les conversations, elles seront perdues et ne pourront pas être récupérées !",
+  "termsOfUse": "Conditions d'utilisation",
+  "privacyPolicy": "Politique de confidentialité",
+  "version": "Version",
+  "welcomeMessage": "Bonjour, je suis AquaChat.",
+  "howCanIHelp": "Comment puis-je vous aider aujourd'hui ?",
+  "tipsFishHealth": "Conseils pour améliorer la santé des poissons ?",
+  "setupFishFarm": "Comment créer une petite ferme piscicole ?",
+  "waterQuality": "Meilleures pratiques pour la qualité de l'eau ?",
+  "phLevel": "Quel est le niveau de pH idéal pour les poissons ?",
+  "searchChats": "Rechercher des conversations...",
+  "continue": "Continuer",
+  "chooseLanguage": "Choisissez votre\nLangue Préférée",
+  "chooseLanguageSubtitle": "Choisissez une langue pour commencer à discuter et obtenir des réponses instantanées à vos questions sur l'aquaculture."
+} 

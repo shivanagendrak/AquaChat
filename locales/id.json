@@ -1,0 +1,22 @@
+{
+  "appName": "AquaChat",
+  "newChat": "Obrolan Baru",
+  "askAnything": "Tanyakan apapun tentang Akuakultur",
+  "thinking": "berpikir",
+  "deleteAllChats": "Hapus semua obrolan",
+  "deleteAllChatsConfirm": "Apakah Anda yakin ingin menghapus semua obrolan? Tindakan ini tidak dapat dibatalkan.",
+  "deleteAllChatsWarning": "Peringatan! Dengan menghapus semua obrolan, percakapan akan hilang dan tidak dapat dipulihkan!",
+  "termsOfUse": "Ketentuan penggunaan",
+  "privacyPolicy": "Kebijakan privasi",
+  "version": "Versi",
+  "welcomeMessage": "Halo, saya AquaChat.",
+  "howCanIHelp": "Bagaimana saya bisa membantu Anda hari ini?",
+  "tipsFishHealth": "Tips untuk meningkatkan kesehatan ikan?",
+  "setupFishFarm": "Bagaimana cara mendirikan peternakan ikan kecil?",
+  "waterQuality": "Praktik terbaik untuk kualitas air?",
+  "phLevel": "Berapa tingkat pH ideal untuk ikan?",
+  "searchChats": "Cari obrolan...",
+  "continue": "Lanjutkan",
+  "chooseLanguage": "Pilih Bahasa\nPilihan Anda",
+  "chooseLanguageSubtitle": "Pilih bahasa untuk mulai mengobrol dan mendapatkan jawaban instan untuk pertanyaan akuakultur Anda."
+} 

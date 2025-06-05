@@ -1,0 +1,22 @@
+{
+  "appName": "AquaChat",
+  "newChat": "新規チャット",
+  "askAnything": "水産養殖について何でも質問してください",
+  "thinking": "考え中",
+  "deleteAllChats": "すべてのチャットを削除",
+  "deleteAllChatsConfirm": "すべてのチャットを削除してもよろしいですか？この操作は元に戻せません。",
+  "deleteAllChatsWarning": "警告！すべてのチャットを削除すると、会話は失われ、復元できません！",
+  "termsOfUse": "利用規約",
+  "privacyPolicy": "プライバシーポリシー",
+  "version": "バージョン",
+  "welcomeMessage": "こんにちは、AquaChatです。",
+  "howCanIHelp": "今日はどのようなお手伝いができますか？",
+  "tipsFishHealth": "魚の健康を改善するためのヒント？",
+  "setupFishFarm": "小規模な養魚場の設置方法？",
+  "waterQuality": "水質管理のベストプラクティス？",
+  "phLevel": "魚に最適なpH値は？",
+  "searchChats": "チャットを検索...",
+  "continue": "続ける",
+  "chooseLanguage": "希望の\n言語を選択",
+  "chooseLanguageSubtitle": "言語を選択して、水産養殖に関する質問に即座に回答を得ることができます。"
+} 

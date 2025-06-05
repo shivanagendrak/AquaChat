@@ -1,0 +1,22 @@
+{
+  "appName": "AquaChat",
+  "newChat": "Bagong Chat",
+  "askAnything": "Magtanong ng kahit ano tungkol sa Aquaculture",
+  "thinking": "nag-iisip",
+  "deleteAllChats": "Tanggalin ang lahat ng chat",
+  "deleteAllChatsConfirm": "Sigurado ka bang gusto mong tanggalin ang lahat ng chat? Hindi na ito maibabalik.",
+  "deleteAllChatsWarning": "Babala! Sa pagtanggal ng lahat ng chat, mawawala ang mga usapan at hindi na maibabalik!",
+  "termsOfUse": "Mga tuntunin ng paggamit",
+  "privacyPolicy": "Patakaran sa privacy",
+  "version": "Bersyon",
+  "welcomeMessage": "Hi, ako si AquaChat.",
+  "howCanIHelp": "Paano kita matutulungan ngayon?",
+  "tipsFishHealth": "Mga tip para sa pagpapabuti ng kalusugan ng isda?",
+  "setupFishFarm": "Paano mag-setup ng maliit na fish farm?",
+  "waterQuality": "Mga best practices para sa kalidad ng tubig?",
+  "phLevel": "Ano ang ideal na pH level para sa isda?",
+  "searchChats": "Maghanap ng chat...",
+  "continue": "Magpatuloy",
+  "chooseLanguage": "Piliin ang Iyong\nGustong Wika",
+  "chooseLanguageSubtitle": "Pumili ng wika para makapagsimula ng chat at makakuha ng instant na sagot sa iyong mga tanong tungkol sa aquaculture."
+} 

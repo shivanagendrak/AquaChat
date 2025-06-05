@@ -3,8 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAppTranslation } from '../hooks/useAppTranslation';
+import { Language } from '../i18n';
 
-const languages = [
+const languages: { code: Language; label: string }[] = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
   { code: 'fr', label: 'Français' },
@@ -20,7 +22,7 @@ const languages = [
 const { width } = Dimensions.get('window');
 
 // Group languages into rows for manual layout
-const languageRows = [
+const languageRows: { code: Language; label: string }[][] = [
   [
     { code: 'en', label: 'English' },
     { code: 'es', label: 'Español' },
@@ -41,20 +43,19 @@ const languageRows = [
   ],
 ];
 
-export default function LanguagePage() {
-  const [selected, setSelected] = useState<string | null>(null);
+function LanguageSelectionContent() {
+  const [selected, setSelected] = useState<Language | null>(null);
+  const { t, setLanguage } = useAppTranslation();
 
   const handleContinue = async () => {
     try {
-      // Store the selected language
-      await AsyncStorage.setItem('selectedLanguage', selected || 'en');
-      // Set the flag to indicate we're coming from language selection
-      await AsyncStorage.setItem('fromLanguage', 'true');
-      // Navigate to main screen
-      router.replace('/');
+      if (selected) {
+        await setLanguage(selected);
+        await AsyncStorage.setItem('fromLanguage', 'true');
+        router.replace('/');
+      }
     } catch (error) {
       console.error('Error saving language preference:', error);
-      // Still try to navigate even if storage fails
       router.replace('/');
     }
   };
@@ -74,9 +75,9 @@ export default function LanguagePage() {
         />
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Choose Your{"\n"}Preferred Language</Text>
+        <Text style={styles.title}>{t('chooseLanguage')}</Text>
         <Text style={styles.subtitle}>
-          Choose a language to start chatting and get instant answers to your aquaculture questions.
+          {t('chooseLanguageSubtitle')}
         </Text>
         <View style={styles.optionsGrid}>
           {languageRows.map((row, rowIndex) => (
@@ -100,10 +101,14 @@ export default function LanguagePage() {
         onPress={handleContinue}
         disabled={!selected}
       >
-        <Text style={styles.continueButtonText}>Continue</Text>
+        <Text style={styles.continueButtonText}>{t('continue')}</Text>
       </TouchableOpacity>
     </View>
   );
+}
+
+export default function LanguagePage() {
+  return <LanguageSelectionContent />;
 }
 
 const styles = StyleSheet.create({

@@ -1,0 +1,22 @@
+{
+  "appName": "AquaChat",
+  "newChat": "New Chat",
+  "askAnything": "Ask anything on Aquaculture",
+  "thinking": "thinking",
+  "deleteAllChats": "Delete all chats",
+  "deleteAllChatsConfirm": "Are you sure you want to delete all chats? This cannot be undone.",
+  "deleteAllChatsWarning": "Warning! By deleting all chats, conversations will be lost and cannot be recovered!",
+  "termsOfUse": "Terms of use",
+  "privacyPolicy": "Privacy policy",
+  "version": "Version",
+  "welcomeMessage": "Hi, I'm AquaChat.",
+  "howCanIHelp": "How can I help you today?",
+  "tipsFishHealth": "Tips to improve fish health?",
+  "setupFishFarm": "How to set up a small fish farm?",
+  "waterQuality": "Best practices for water quality?",
+  "phLevel": "What is the ideal pH level for fish?",
+  "searchChats": "Search chats...",
+  "continue": "Continue",
+  "chooseLanguage": "Choose Your\nPreferred Language",
+  "chooseLanguageSubtitle": "Choose a language to start chatting and get instant answers to your aquaculture questions."
+} 

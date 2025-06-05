@@ -1,0 +1,22 @@
+{
+  "appName": "AquaChat",
+  "newChat": "新对话",
+  "askAnything": "询问任何水产养殖相关问题",
+  "thinking": "思考中",
+  "deleteAllChats": "删除所有对话",
+  "deleteAllChatsConfirm": "确定要删除所有对话吗？此操作无法撤销。",
+  "deleteAllChatsWarning": "警告！删除所有对话后，内容将无法恢复！",
+  "termsOfUse": "使用条款",
+  "privacyPolicy": "隐私政策",
+  "version": "版本",
+  "welcomeMessage": "你好，我是 AquaChat。",
+  "howCanIHelp": "今天我能帮你什么？",
+  "tipsFishHealth": "如何改善鱼类健康？",
+  "setupFishFarm": "如何建立小型养鱼场？",
+  "waterQuality": "水质管理的最佳实践？",
+  "phLevel": "鱼类理想的 pH 值是多少？",
+  "searchChats": "搜索对话...",
+  "continue": "继续",
+  "chooseLanguage": "选择您的\n首选语言",
+  "chooseLanguageSubtitle": "选择一种语言开始聊天，获取水产养殖问题的即时答案。"
+} 

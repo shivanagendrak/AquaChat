@@ -8,6 +8,7 @@ import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidi
 import Markdown from 'react-native-markdown-display';
 import SplashScreen from "../components/SplashScreen";
 import { ThemeProvider, useTheme } from "../components/theme";
+import { TranslationProvider, useAppTranslation } from '../hooks/useAppTranslation';
 
 interface Message {
   id: string;
@@ -28,7 +29,7 @@ interface Chat {
   updatedAt: number;
 }
 
-async function generateResponse(prompt: string): Promise<string> {
+async function generateResponse(prompt: string, language: string): Promise<string> {
   try {
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyDX9yToRl70aBizk0c9OpcSW_bk6vu-rK0",
@@ -42,7 +43,7 @@ async function generateResponse(prompt: string): Promise<string> {
             {
               parts: [
                 {
-                  text: prompt
+                  text: `Please respond in ${language}. ${prompt}`
                 }
               ]
             }
@@ -193,6 +194,7 @@ interface MenuPanelProps {
 
 const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchChat, onNewChat, showDeleteForId, setShowDeleteForId, deleteChat }: MenuPanelProps) => {
   const { colors } = useTheme();
+  const { t } = useAppTranslation();
   const screenWidth = Dimensions.get('window').width;
   const menuWidth = screenWidth * 0.75;
 
@@ -295,7 +297,7 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Search chats..."
+                placeholder={t('searchChats')}
                 placeholderTextColor={colors.placeholderText}
                 style={{
                   backgroundColor: colors.inputBackground,
@@ -356,26 +358,26 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
               onPress={handleDeleteAllChats}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#d32f2f', fontWeight: '700', fontSize: 17, textAlign: 'center' }}>Delete all chats </Text>
+                <Text style={{ color: '#d32f2f', fontWeight: '700', fontSize: 17, textAlign: 'center' }}>{t('deleteAllChats')} </Text>
                 <Text style={{ color: colors.placeholderText, fontWeight: '500', fontSize: 15, textAlign: 'center' }}>{storageSize}</Text>
               </View>
             </TouchableOpacity>
             {storageBytes > 5 * 1024 * 1024 * 1024 && (
               <Text style={{ color: '#d32f2f', fontSize: 14, marginBottom: 12, marginTop: 2 }}>
-                Warning! By deleting all chats, conversations will be lost and cannot be recovered!
+                {t('deleteAllChatsWarning')}
               </Text>
             )}
             <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 12 }} />
             <Text style={{ color: colors.placeholderText, fontSize: 14, marginBottom: 6 }}>
-              <Text>AquaChat - Version {appVersion}</Text>
+              <Text>{t('appName')} - {t('version')} {appVersion}</Text>
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8 }}>
               <TouchableOpacity onPress={() => openUrl('https://kurma.ai/term-conditions')}>
-                <Text style={{ color: colors.placeholderText, fontSize: 14, textDecorationLine: 'underline' }}>Terms of use</Text>
+                <Text style={{ color: colors.placeholderText, fontSize: 14, textDecorationLine: 'underline' }}>{t('termsOfUse')}</Text>
               </TouchableOpacity>
               <Text style={{ color: colors.placeholderText, fontSize: 14, marginHorizontal: 6 }}>|</Text>
               <TouchableOpacity onPress={() => openUrl('https://kurma.ai/privacy-policy')}>
-                <Text style={{ color: colors.placeholderText, fontSize: 14, textDecorationLine: 'underline' }}>Privacy policy</Text>
+                <Text style={{ color: colors.placeholderText, fontSize: 14, textDecorationLine: 'underline' }}>{t('privacyPolicy')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -400,6 +402,7 @@ const saveChatsToStorage = async (chatsToSave: Chat[]) => {
 // Add ChatPromptPanel component
 const ChatPromptPanel = ({ onSelect }: { onSelect: (q: string) => void }) => {
   const { colors, theme } = useTheme();
+  const { t } = useAppTranslation();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.background }}>
       <Image
@@ -408,38 +411,38 @@ const ChatPromptPanel = ({ onSelect }: { onSelect: (q: string) => void }) => {
         resizeMode="contain"
       />
       <Text style={{ fontSize: 26, fontWeight: '700', marginBottom: 8, color: colors.text, textAlign: 'center' }}>
-        Hi, I'm AquaChat.
+        {t('welcomeMessage')}
       </Text>
       <Text style={{ fontSize: 18, color: colors.placeholderText, marginBottom: 28, textAlign: 'center' }}>
-        How can I help you today?
+        {t('howCanIHelp')}
       </Text>
       <View style={{ width: '100%', maxWidth: 400 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
           <TouchableOpacity
             style={{ flex: 1, marginRight: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
-            onPress={() => onSelect('Tips to improve fish health?')}
+            onPress={() => onSelect(t('tipsFishHealth'))}
           >
-            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>Tips to improve{Platform.OS === 'web' ? '\n' : ' '}fish health?</Text>
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>{t('tipsFishHealth')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={{ flex: 1, marginLeft: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
-            onPress={() => onSelect('How to set up a small fish farm?')}
+            onPress={() => onSelect(t('setupFishFarm'))}
           >
-            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>How to set up a{Platform.OS === 'web' ? '\n' : ' '}small fish farm?</Text>
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>{t('setupFishFarm')}</Text>
           </TouchableOpacity>
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <TouchableOpacity
             style={{ flex: 1, marginRight: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
-            onPress={() => onSelect('Best practices for water quality?')}
+            onPress={() => onSelect(t('waterQuality'))}
           >
-            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>Best practices for{Platform.OS === 'web' ? '\n' : ' '}water quality?</Text>
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>{t('waterQuality')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={{ flex: 1, marginLeft: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, backgroundColor: colors.inputBackground }}
-            onPress={() => onSelect('What is the ideal pH level for fish?')}
+            onPress={() => onSelect(t('phLevel'))}
           >
-            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>What is the ideal{Platform.OS === 'web' ? '\n' : ' '}pH level for fish?</Text>
+            <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>{t('phLevel')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -463,6 +466,7 @@ function AppContent() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [showDeleteForId, setShowDeleteForId] = useState<string | null>(null);
   const [headerTitle, setHeaderTitle] = useState('New Chat');
+  const { t, language } = useAppTranslation();
 
   const headerStyles = StyleSheet.create({
     header: {
@@ -558,7 +562,7 @@ function AppContent() {
     setError(null);
 
     try {
-      const response = await generateResponse(text.trim());
+      const response = await generateResponse(text.trim(), language);
       if (response.startsWith('Error:')) {
         setError(response);
         setMessages(prev => {
@@ -659,7 +663,7 @@ function AppContent() {
             return updated;
           });
           try {
-            const response = await generateResponse(userMessageText);
+            const response = await generateResponse(userMessageText, language);
             if (response.startsWith('Error:')) {
               setError(response);
               setMessages(prev => {
@@ -1720,7 +1724,7 @@ function AppContent() {
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              {headerTitle}
+              {headerTitle || t('newChat')}
             </Text>
           </View>
           <TouchableOpacity 
@@ -1781,7 +1785,7 @@ function AppContent() {
                             paddingRight: 48,
                           }
                         ]}
-                        placeholder="Ask anything on Aquaculture"
+                        placeholder={t('askAnything')}
                         placeholderTextColor={colors.placeholderText}
                         multiline
                         value={text}
@@ -1876,7 +1880,9 @@ export default function Index() {
 
   return (
     <ThemeProvider>
-      <AppContent />
+      <TranslationProvider>
+        <AppContent />
+      </TranslationProvider>
     </ThemeProvider>
   );
 }
