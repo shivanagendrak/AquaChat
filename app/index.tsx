@@ -4,11 +4,26 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import Markdown from 'react-native-markdown-display';
 import SplashScreen from "../components/SplashScreen";
 import { ThemeProvider, useTheme } from "../components/theme";
 import { TranslationProvider, useAppTranslation } from '../hooks/useAppTranslation';
+import { Language } from "../i18n";
+
+// Define language options
+const languageOptions: { code: Language; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'zh', label: '中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'pt', label: 'Português' },
+  { code: 'id', label: 'Bahasa' },
+  { code: 'tl', label: 'Tagalog' },
+  { code: 'it', label: 'Italiano' },
+];
 
 interface Message {
   id: string;
@@ -194,9 +209,11 @@ interface MenuPanelProps {
 
 const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchChat, onNewChat, showDeleteForId, setShowDeleteForId, deleteChat }: MenuPanelProps) => {
   const { colors } = useTheme();
-  const { t } = useAppTranslation();
+  const { t, language, setLanguage } = useAppTranslation();
   const screenWidth = Dimensions.get('window').width;
   const menuWidth = screenWidth * 0.75;
+  const router = useRouter();
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   const [search, setSearch] = React.useState('');
   const filteredChats = chats.filter(chat =>
@@ -263,8 +280,73 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
     onClose();
   };
 
+  const handleLanguagePress = () => {
+    setShowLanguageModal(true);
+  };
+
+  const handleLanguageSelect = async (selectedLanguage: Language) => {
+    try {
+      await setLanguage(selectedLanguage);
+      setShowLanguageModal(false);
+    } catch (error) {
+      console.error('Error changing language:', error);
+    }
+  };
+
+  const LanguageModal = () => {
+    if (!showLanguageModal) return null;
+
+    return (
+      <Modal
+        transparent
+        visible={showLanguageModal}
+        animationType="fade"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowLanguageModal(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{t('appLanguage')}</Text>
+              <TouchableOpacity 
+                onPress={() => setShowLanguageModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.languageList}>
+              {languageOptions.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.languageOption,
+                    { backgroundColor: colors.inputBackground },
+                    language === lang.code && { backgroundColor: colors.border }
+                  ]}
+                  onPress={() => handleLanguageSelect(lang.code)}
+                >
+                  <Text style={[styles.languageOptionText, { color: colors.text }]}>
+                    {lang.label}
+                  </Text>
+                  {language === lang.code && (
+                    <Ionicons name="checkmark" size={20} color={colors.text} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   return (
     <>
+      <LanguageModal />
       <Animated.View
         pointerEvents={isOpen ? 'auto' : 'none'}
         style={{
@@ -368,10 +450,32 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
               </Text>
             )}
             <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 12 }} />
+            <TouchableOpacity 
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                paddingVertical: 8,
+                marginBottom: 12,
+                backgroundColor: colors.inputBackground,
+                borderRadius: 8,
+                paddingHorizontal: 12
+              }}
+              onPress={handleLanguagePress}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="language-outline" size={20} color={colors.text} style={{ marginRight: 8 }} />
+                <Text style={{ color: colors.text, fontSize: 15 }}>{t('appLanguage')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ color: colors.placeholderText, fontSize: 14, marginRight: 4 }}>{language.toUpperCase()}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.placeholderText} />
+              </View>
+            </TouchableOpacity>
             <Text style={{ color: colors.placeholderText, fontSize: 14, marginBottom: 6 }}>
               <Text>{t('appName')} - {t('version')} {appVersion}</Text>
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-start', gap: 8, marginTop: 2 }}>
               <TouchableOpacity onPress={() => openUrl('https://kurma.ai/term-conditions')}>
                 <Text style={{ color: colors.placeholderText, fontSize: 14, textDecorationLine: 'underline' }}>{t('termsOfUse')}</Text>
               </TouchableOpacity>
@@ -2085,5 +2189,43 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 999,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    maxHeight: '80%',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  languageList: {
+    maxHeight: 400,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  languageOptionText: {
+    fontSize: 16,
   },
 });
