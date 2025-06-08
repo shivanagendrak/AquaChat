@@ -44,13 +44,13 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   logo: {
-    width: 140,
-    height: 140,
-    marginBottom: 24,
+    width: 120,
+    height: 120,
+    marginBottom: 4,
     resizeMode: "contain",
   },
   appName: {
-    fontSize: 26,
+    fontSize: 34,
     fontWeight: "600",
     color: "#fff",
     letterSpacing: 1,
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     opacity: 0.8,
     fontFamily: "BricolageGrotesque-Regular", // Use Bricolage Grotesque for powered by text
-    fontStyle: "italic",
+    
   },
   kurmaBold: {
     fontWeight: "bold",

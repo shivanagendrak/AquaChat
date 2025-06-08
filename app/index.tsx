@@ -1962,7 +1962,7 @@ export default function Index() {
         const timer = setTimeout(() => {
           setShowSplash(false);
           router.replace('/get-started');
-        }, 2000);
+        }, 1500);
         return () => clearTimeout(timer);
       } catch (error) {
         console.error('Error checking navigation state:', error);
