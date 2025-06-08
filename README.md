@@ -1,50 +1,78 @@
-# Welcome to your Aqua app 👋
+# AquaChat
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![AquaChat Logo](./assets/images/splash-icon-light.png)
 
-## Get started
+AquaChat is an LLM-powered chat application designed specifically for the aquaculture industry. Inspired by the mission of [Kurma AI](https://kurma.ai/) to drive sustainable innovation with advanced AI, AquaChat leverages Large Language Models to provide real-time, intelligent support and recommendations for fish farming and marine ecosystem management.
 
-1. Install dependencies
+This project is part of a broader initiative to accelerate responsible growth and operational efficiency in aquaculture, supporting the UN’s sustainability goals through cutting-edge AI solutions.
 
-   ```bash
-   npm install
-   ```
+AquaChat is a cross-platform chat application built with [Expo](https://expo.dev) and React Native. It supports multiple languages and offers a modern, responsive UI for seamless communication.
 
-2. Start the app
+## Features
 
-   ```bash
-   npx expo start
-   ```
+- Real-time chat interface
+- Multi-language support (English, Spanish, French, etc.)
+- Theming and custom splash screen
+- File-based routing for easy navigation
+- Works on Android, iOS, and web
 
-In the output, you'll find options to open the app in a
+## Getting Started
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 1. Install dependencies
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+```bash
+npm install
+```
 
-## Get a fresh project
+### 2. Start the app
 
-When you're ready, run:
+```bash
+npx expo start
+```
+
+You can then open the app in:
+
+- [Expo Go](https://expo.dev/go) on your device
+- Android emulator
+- iOS simulator
+- Web browser
+
+Edit files inside the **app/** directory to start developing. Routing is handled automatically based on the file structure.
+
+## Project Structure
+
+```
+app/            # App screens and routes
+components/     # Reusable UI components
+assets/         # Images and fonts
+locales/        # Translation files (JSON)
+hooks/          # Custom React hooks
+```
+
+## Localization
+
+AquaChat supports multiple languages. Add or edit translations in the `locales/` directory. Language selection is available in the app settings.
+
+## Resetting the Project
+
+To reset the app to a blank state:
 
 ```bash
 npm run reset-project
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+This moves starter code to **app-example/** and creates a blank **app/** directory.
 
-## Learn more
+## Learn More
 
-To learn more about developing your project with Expo, look at the following resources:
+- [Expo documentation](https://docs.expo.dev/)
+- [React Native documentation](https://reactnative.dev/)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Contributing
 
-## Join the community
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
-Join our community of developers creating universal apps.
+## Community
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- [Expo on GitHub](https://github.com/expo/expo)
+- [Expo Discord](https://chat.expo.dev)
