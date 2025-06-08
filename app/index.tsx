@@ -47,7 +47,7 @@ interface Chat {
 async function generateResponse(prompt: string, language: string): Promise<string> {
   try {
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyDX9yToRl70aBizk0c9OpcSW_bk6vu-rK0",
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GOOGLE_GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
@@ -1672,7 +1672,7 @@ function AppContent() {
         return;
       }
 
-      const currentChat = chats.find(c => c.id === currentChatId);
+      const currentChat = chats.find((c: Chat) => c.id === currentChatId);
       if (!currentChat) {
         setHeaderTitle('New Chat');
         return;
