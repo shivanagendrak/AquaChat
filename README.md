@@ -10,7 +10,7 @@
 ---
 
 <p align="center">
-  <img src="./assets/images/slide1.jpg" alt="AquaChat Demo" width="70%" style="border-radius:16px; box-shadow:0 6px 24px #b3e0ff; margin: 24px 0;" />
+  <img src="./assets/images/slide11.jpg" alt="AquaChat Demo" width="70%" style="border-radius:16px; box-shadow:0 6px 24px #b3e0ff; margin: 24px 0;" />
 </p>
 
 <p align="center">
