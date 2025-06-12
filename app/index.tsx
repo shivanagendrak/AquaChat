@@ -1,15 +1,22 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { Ionicons, SimpleLineIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import Markdown from 'react-native-markdown-display';
 import SplashScreen from "../components/SplashScreen";
 import { ThemeProvider, useTheme } from "../components/theme";
 import { TranslationProvider, useAppTranslation } from '../hooks/useAppTranslation';
 import { Language } from "../i18n";
+
+// Initialize Anthropic client with API key from environment
+const anthropic = new Anthropic({
+  apiKey: Constants.expoConfig?.extra?.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+});
 
 // Define language options
 const languageOptions: { code: Language; label: string }[] = [
@@ -46,62 +53,27 @@ interface Chat {
 
 async function generateResponse(prompt: string, language: string): Promise<string> {
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GOOGLE_GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Please respond in ${language}. ${prompt}`
-                }
-              ]
-            }
-          ]
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('API Error Response:', errorData);
-      throw new Error(`API Error: ${response.status} ${errorData.error?.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    console.log('API Response:', data); // Debug log
-
-    // Check if we have a valid response with content
-    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      // Try to access the content directly if it's not in the expected format
-      const content = data.candidates?.[0]?.content;
-      if (typeof content === 'object' && content !== null) {
-        // If content is an object, try to stringify it to see what we have
-        console.log('Content object:', JSON.stringify(content, null, 2));
-        // If it has a text property, use that
-        if (content.text) {
-          return content.text;
+    const response = await anthropic.messages.create({
+      model: "claude-3-7-sonnet-20250219", // Using the latest Claude 3.7 Sonnet model
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: `Please respond in ${language}. ${prompt}`
         }
-        // If it has parts array, try to get text from there
-        if (Array.isArray(content.parts)) {
-          const textPart = content.parts.find((part: ContentPart) => part.text);
-          if (textPart?.text) {
-            return textPart.text;
-          }
-        }
-      }
-      console.error('Unexpected API Response Structure:', data);
+      ]
+    });
+
+    // Type guard to check if the content is a text block
+    const content = response.content[0];
+    if (!content || content.type !== 'text') {
+      console.error('Unexpected API Response Structure:', response);
       throw new Error('Invalid response format from API');
     }
 
-    return data.candidates[0].content.parts[0].text;
+    return content.text;
   } catch (error) {
-    console.error('Error calling Gemini API:', error);
+    console.error('Error calling Claude API:', error);
     if (error instanceof Error) {
       return `Error: ${error.message}`;
     }
@@ -138,48 +110,46 @@ const ThinkingText = () => {
   const dot2Opacity = useRef(new Animated.Value(0)).current;
   const dot3Opacity = useRef(new Animated.Value(0)).current;
 
+  const animateDot = useCallback((dot: Animated.Value, delay: number) => {
+    return Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(dot, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(dot, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]);
+  }, []);
+
+  const startAnimation = useCallback(() => {
+    Animated.loop(
+      Animated.parallel([
+        animateDot(dot1Opacity, 0),
+        animateDot(dot2Opacity, 200),
+        animateDot(dot3Opacity, 400),
+      ])
+    ).start();
+  }, [dot1Opacity, dot2Opacity, dot3Opacity, animateDot]);
+
   useEffect(() => {
-    const animateDot = (dot: Animated.Value, delay: number) => {
-      return Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(dot, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dot, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]);
-    };
-
-    const startAnimation = () => {
-      Animated.loop(
-        Animated.parallel([
-          animateDot(dot1Opacity, 0),
-          animateDot(dot2Opacity, 200),
-          animateDot(dot3Opacity, 400),
-        ])
-      ).start();
-    };
-
     startAnimation();
-
     return () => {
       dot1Opacity.stopAnimation();
       dot2Opacity.stopAnimation();
       dot3Opacity.stopAnimation();
     };
-  }, []);
+  }, [startAnimation, dot1Opacity, dot2Opacity, dot3Opacity]);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <Text style={{ fontSize: 16, color: '#666' }}>Thinking</Text>
-      <Animated.Text style={{ opacity: dot1Opacity, fontSize: 16, color: '#666' }}>.</Animated.Text>
-      <Animated.Text style={{ opacity: dot2Opacity, fontSize: 16, color: '#666' }}>.</Animated.Text>
-      <Animated.Text style={{ opacity: dot3Opacity, fontSize: 16, color: '#666' }}>.</Animated.Text>
+    <View style={styles.thinkingContainer}>
+      <Animated.View style={[styles.thinkingDot, { opacity: dot1Opacity }]} />
+      <Animated.View style={[styles.thinkingDot, { opacity: dot2Opacity }]} />
+      <Animated.View style={[styles.thinkingDot, { opacity: dot3Opacity }]} />
     </View>
   );
 };
@@ -2227,5 +2197,15 @@ const styles = StyleSheet.create({
   },
   languageOptionText: {
     fontSize: 16,
+  },
+  thinkingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  thinkingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 2,
   },
 });
