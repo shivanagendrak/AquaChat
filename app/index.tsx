@@ -6,8 +6,9 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { Animated, Dimensions, Easing, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import Markdown from 'react-native-markdown-display';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import SplashScreen from "../components/SplashScreen";
 import { ThemeProvider, useTheme } from "../components/theme";
 import { TranslationProvider, useAppTranslation } from '../hooks/useAppTranslation';
@@ -186,9 +187,20 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   const [search, setSearch] = React.useState('');
-  const filteredChats = chats.filter(chat =>
-    chat.title.toLowerCase().includes(search.toLowerCase())
-  );
+  // Make filteredChats more defensive
+  const filteredChats = React.useMemo(() => {
+    if (!Array.isArray(chats)) {
+      console.warn('Chats is not an array in MenuPanel');
+      return [];
+    }
+    return chats.filter(chat => {
+      if (!chat || typeof chat.title !== 'string') {
+        console.warn('Invalid chat found in filter:', chat);
+        return false;
+      }
+      return chat.title.toLowerCase().includes(search.toLowerCase());
+    });
+  }, [chats, search]);
 
   // Dynamic storage size calculation
   const [storageSize, setStorageSize] = React.useState('0 KB');
@@ -212,20 +224,59 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
         else size = `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
         setStorageSize(size);
       } catch (e) {
+        console.error('Error calculating storage size:', e);
         setStorageSize('?');
         setStorageBytes(0);
       }
     };
-    calcStorageSize();
+    if (isOpen) {
+      calcStorageSize();
+    }
   }, [isOpen, chats]);
 
   const appVersion = '1.0.1';
 
   const handleDeleteAllChats = () => {
-    if (window.confirm && typeof window.confirm === 'function') {
-      if (!window.confirm('Are you sure you want to delete all chats? This cannot be undone.')) return;
+    if (!Array.isArray(chats)) {
+      console.error('Cannot delete chats: chats is not an array');
+      return;
     }
-    chats.forEach(chat => deleteChat(chat.id));
+    
+    if (window.confirm && typeof window.confirm === 'function') {
+      if (!window.confirm(t('deleteAllChatsConfirm'))) return;
+    }
+    
+    // Delete chats one by one to ensure proper state updates
+    const deleteNext = async (index: number) => {
+      if (index >= chats.length) return;
+      try {
+        await deleteChat(chats[index].id);
+        // Use setTimeout to avoid stack overflow with many chats
+        setTimeout(() => deleteNext(index + 1), 0);
+      } catch (error) {
+        console.error('Error deleting chat:', error);
+        // Continue with next chat even if one fails
+        setTimeout(() => deleteNext(index + 1), 0);
+      }
+    };
+    
+    deleteNext(0);
+  };
+
+  const handleChatPress = (chatId: string) => {
+    if (!chatId) {
+      console.warn('Invalid chatId in handleChatPress');
+      return;
+    }
+    if (showDeleteForId === chatId) {
+      return;
+    }
+    try {
+      onSwitchChat(chatId);
+      onClose();
+    } catch (error) {
+      console.error('Error switching chat:', error);
+    }
   };
 
   const openUrl = (url: string) => {
@@ -241,14 +292,6 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
     inputRange: [0, 1],
     outputRange: [0, 0.5],
   });
-
-  const handleChatPress = (chatId: string) => {
-    if (showDeleteForId === chatId) {
-      return;
-    }
-    onSwitchChat(chatId);
-    onClose();
-  };
 
   const handleLanguagePress = () => {
     setShowLanguageModal(true);
@@ -366,42 +409,60 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
                 clearButtonMode="while-editing"
               />
             </View>
-            <FlatList
-              data={filteredChats}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.menuItem,
-                    currentChatId === item.id && { backgroundColor: colors.inputBackground }
-                  ]}
-                  onPress={() => handleChatPress(item.id)}
-                  onLongPress={() => setShowDeleteForId(showDeleteForId === item.id ? null : item.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuItemContent}>
-                    <Text 
+            {Array.isArray(filteredChats) && filteredChats.length > 0 ? (
+              <FlatList
+                data={filteredChats}
+                keyExtractor={item => item?.id || Math.random().toString()}
+                renderItem={({ item }) => {
+                  if (!item || !item.id) {
+                    console.warn('Invalid chat item in FlatList:', item);
+                    return null;
+                  }
+                  return (
+                    <TouchableOpacity
                       style={[
-                        styles.menuItemText, 
-                        { color: colors.text },
-                        currentChatId === item.id && { fontWeight: '600' }
-                      ]} 
-                      numberOfLines={1}
+                        styles.menuItem,
+                        currentChatId === item.id && { backgroundColor: colors.inputBackground }
+                      ]}
+                      onPress={() => handleChatPress(item.id)}
+                      onLongPress={() => setShowDeleteForId(item.id)}
                     >
-                      {item.title}
+                      <View style={{ flex: 1 }}>
+                        <Text 
+                          style={[styles.menuItemText, { color: colors.text }]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {item.title || t('newChat')}
+                        </Text>
+                      </View>
+                      {showDeleteForId === item.id && (
+                        <TouchableOpacity
+                          onPress={() => deleteChat(item.id)}
+                          style={styles.deleteButton}
+                        >
+                          <Ionicons name="trash-outline" size={20} color="#d32f2f" />
+                        </TouchableOpacity>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+                contentContainerStyle={{ flexGrow: 1 }}
+                ListEmptyComponent={
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                    <Text style={{ color: colors.placeholderText, textAlign: 'center' }}>
+                      {search ? t('noChatsFound') : t('noChats')}
                     </Text>
-                    {showDeleteForId === item.id && (
-                      <TouchableOpacity 
-                        onPress={() => deleteChat(item.id)} 
-                        style={styles.deleteButton}
-                      >
-                        <Ionicons name="trash-outline" size={20} color={colors.text} />
-                      </TouchableOpacity>
-                    )}
                   </View>
-                </TouchableOpacity>
-              )}
-            />
+                }
+              />
+            ) : (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                <Text style={{ color: colors.placeholderText, textAlign: 'center' }}>
+                  {search ? t('noChatsFound') : t('noChats')}
+                </Text>
+              </View>
+            )}
           </View>
           {/* Footer section */}
           <View style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 16, backgroundColor: colors.background }}>
@@ -536,11 +597,12 @@ function AppContent() {
   const flatListRef = useRef<FlatList>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]); // Initialize as empty array
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [showDeleteForId, setShowDeleteForId] = useState<string | null>(null);
   const [headerTitle, setHeaderTitle] = useState('New Chat');
   const { t, language } = useAppTranslation();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const headerStyles = StyleSheet.create({
     header: {
@@ -1576,15 +1638,17 @@ function AppContent() {
   };
 
   const scrollToBottom = () => {
-    if (flatListRef.current && messages.length > 0) {
+    if (flatListRef.current) {
       flatListRef.current.scrollToEnd({ animated: true });
     }
   };
 
   // Add useEffect to scroll when messages change
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages, isStreaming]);
 
   // Load chats from storage on mount
   const loadChats = async () => {
@@ -1594,8 +1658,8 @@ function AppContent() {
       
       if (savedChats) {
         const parsedChats = JSON.parse(savedChats);
-        // Validate chat structure
-        const validChats = parsedChats.filter((chat: any) => {
+        // Validate chat structure and ensure it's an array
+        const validChats = Array.isArray(parsedChats) ? parsedChats.filter((chat: any) => {
           const isValid = chat && 
             typeof chat.id === 'string' && 
             typeof chat.title === 'string' && 
@@ -1607,7 +1671,7 @@ function AppContent() {
             console.warn('Invalid chat found:', chat);
           }
           return isValid;
-        });
+        }) : [];
 
         console.log(`Loaded ${validChats.length} valid chats`);
         
@@ -1668,33 +1732,46 @@ function AppContent() {
     if (!currentChatId) return;
     
     setChats(prevChats => {
-      const updatedChats = prevChats.map(chat => {
-        if (chat.id === currentChatId) {
-          const firstUserMessage = newMessages.find(m => m.isUser);
-          const title = firstUserMessage?.text
-            ? (firstUserMessage.text.slice(0, 30) + (firstUserMessage.text.length > 30 ? '...' : ''))
-            : chat.title || 'New Chat';
-          
-          const updatedChat = {
-            ...chat,
-            title,
-            messages: [...newMessages],
-            updatedAt: Date.now(),
-          };
-          
-          // Save immediately after updating a chat
-          saveChatsToStorage([...prevChats.filter(c => c.id !== currentChatId), updatedChat]);
-          
-          return updatedChat;
-        }
-        return chat;
-      });
+      // Ensure prevChats is an array
+      const currentChats = Array.isArray(prevChats) ? prevChats : [];
       
+      // Find the index of the current chat
+      const chatIndex = currentChats.findIndex(chat => chat.id === currentChatId);
+      if (chatIndex === -1) {
+        console.warn('Chat not found for update:', currentChatId);
+        return currentChats;
+      }
+
+      // Get the first user message for the title
+      const firstUserMessage = newMessages.find(m => m.isUser);
+      const title = firstUserMessage?.text
+        ? (firstUserMessage.text.slice(0, 30) + (firstUserMessage.text.length > 30 ? '...' : ''))
+        : currentChats[chatIndex].title || 'New Chat';
+
+      // Create the updated chat
+      const updatedChat = {
+        ...currentChats[chatIndex],
+        title,
+        messages: [...newMessages],
+        updatedAt: Date.now(),
+      };
+
+      // Create new array with updated chat
+      const updatedChats = [...currentChats];
+      updatedChats[chatIndex] = updatedChat;
+
+      // Save to storage
+      try {
+        saveChatsToStorage(updatedChats);
+      } catch (error) {
+        console.error('Error saving chats:', error);
+      }
+
       return updatedChats;
     });
   };
 
-  // Update the createNewChat function
+  // Update createNewChat to be more defensive
   const createNewChat = () => {
     // Save current chat before creating new one
     if (currentChatId) {
@@ -1709,10 +1786,18 @@ function AppContent() {
       updatedAt: Date.now(),
     };
     
-    setChats(prev => {
-      const updatedChats = [newChat, ...prev];
-      // Save immediately after creating new chat
-      saveChatsToStorage(updatedChats);
+    setChats(prevChats => {
+      // Ensure prevChats is an array
+      const currentChats = Array.isArray(prevChats) ? prevChats : [];
+      const updatedChats = [newChat, ...currentChats];
+      
+      // Save to storage
+      try {
+        saveChatsToStorage(updatedChats);
+      } catch (error) {
+        console.error('Error saving new chat:', error);
+      }
+      
       return updatedChats;
     });
     
@@ -1720,51 +1805,70 @@ function AppContent() {
     setMessages([]);
     setText('');
     setIsMenuOpen(false);
-    setHeaderTitle('New Chat'); // Explicitly set header title for new chat
+    setHeaderTitle('New Chat');
   };
 
-  // Update the deleteChat function
+  // Update deleteChat to be more defensive
   const deleteChat = (chatId: string) => {
-    setChats(prev => {
-      const updated = prev.filter(chat => chat.id !== chatId);
-      // Save immediately after deleting a chat
-      saveChatsToStorage(updated);
+    setChats(prevChats => {
+      // Ensure prevChats is an array
+      const currentChats = Array.isArray(prevChats) ? prevChats : [];
+      const updatedChats = currentChats.filter(chat => chat.id !== chatId);
+      
+      // Save to storage
+      try {
+        saveChatsToStorage(updatedChats);
+      } catch (error) {
+        console.error('Error saving after delete:', error);
+      }
       
       // If the deleted chat is the current one, switch to another or clear
       if (currentChatId === chatId) {
-        if (updated.length > 0) {
-          setCurrentChatId(updated[0].id);
-          setMessages(updated[0].messages);
+        if (updatedChats.length > 0) {
+          setCurrentChatId(updatedChats[0].id);
+          setMessages(updatedChats[0].messages);
         } else {
           setCurrentChatId(null);
           setMessages([]);
         }
       }
       
-      return updated;
+      return updatedChats;
     });
     setShowDeleteForId(null);
   };
 
-  // Update the switchChat function
+  // Update switchChat to be more defensive
   const switchChat = (chatId: string) => {
     // Save current chat before switching
     if (currentChatId) {
       updateCurrentChat(messages);
     }
     
-    const chat = chats.find(c => c.id === chatId);
+    const chat = Array.isArray(chats) ? chats.find(c => c.id === chatId) : null;
     if (chat) {
       setCurrentChatId(chatId);
       setMessages(chat.messages);
       setText('');
       setIsMenuOpen(false);
+    } else {
+      console.warn('Chat not found for switching:', chatId);
     }
   };
 
   // Add useEffect for initial load
   useEffect(() => {
-    loadChats();
+    const initializeChats = async () => {
+      try {
+        await loadChats();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error initializing chats:', error);
+        setChats([]); // Ensure chats is an empty array on error
+        setIsInitialized(true);
+      }
+    };
+    initializeChats();
   }, []);
 
   return (
@@ -1816,96 +1920,89 @@ function AppContent() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={{ flex: 1 }}>
-              <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
-                <StatusBar
-                  barStyle={colors.background === '#fff' ? "dark-content" : "light-content"}
-                  backgroundColor={colors.background}
-                />
-                <View style={[styles.mainContainer, { backgroundColor: colors.background }]}> 
-                  <View style={{ flex: 1, minHeight: 0 }}>
-                    {messages.length === 0 ? (
-                      <ChatPromptPanel onSelect={setText} />
-                    ) : (
-                      <FlatList
-                        ref={flatListRef}
-                        data={messages}
-                        renderItem={({ item, index }) => renderMessage({ item, index })}
-                        keyExtractor={item => item.id}
-                        contentContainerStyle={{
-                          flexGrow: 1,
-                          paddingHorizontal: 16,
-                          paddingVertical: 8,
-                          paddingBottom: 48,
-                        }}
-                        onContentSizeChange={scrollToBottom}
-                        onLayout={scrollToBottom}
-                        maintainVisibleContentPosition={{
-                          minIndexForVisible: 0,
-                          autoscrollToTopThreshold: 10
-                        }}
-                      />
+          <View style={{ flex: 1 }}>
+            <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+              <StatusBar
+                barStyle={colors.background === '#fff' ? "dark-content" : "light-content"}
+                backgroundColor={colors.background}
+              />
+              <View style={[styles.mainContainer, { backgroundColor: colors.background }]}> 
+                <View style={{ flex: 1, minHeight: 0 }}>
+                  {messages.length === 0 ? (
+                    <ChatPromptPanel onSelect={setText} />
+                  ) : (
+                    <FlatList
+                      ref={flatListRef}
+                      data={messages}
+                      renderItem={({ item, index }) => renderMessage({ item, index })}
+                      keyExtractor={item => item.id}
+                      keyboardDismissMode="on-drag"
+                      contentContainerStyle={{
+                        flexGrow: 1,
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        paddingBottom: 48,
+                      }}
+                    />
+                  )}
+                </View>
+                <View style={[styles.inputContainer, { backgroundColor: colors.background }]}> 
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.inputBackground,
+                          color: colors.inputText,
+                          paddingRight: 48,
+                        }
+                      ]}
+                      placeholder={t('askAnything')}
+                      placeholderTextColor={colors.placeholderText}
+                      multiline
+                      value={text}
+                      onChangeText={setText}
+                      textAlignVertical="top"
+                      blurOnSubmit={false}
+                    />
+                    {text.trim().length > 0 && !isLoading && (
+                      <TouchableOpacity 
+                        style={styles.submitButton}
+                        onPress={handleSubmit}
+                      >
+                        <Ionicons 
+                          name="arrow-up-circle-sharp" 
+                          size={32} 
+                          color={colors.text} 
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {isLoading && (
+                      <TouchableOpacity style={styles.submitButton} disabled>
+                        <Ionicons
+                          name="arrow-up-circle-outline"
+                          size={32}
+                          color={colors.placeholderText}
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {text.trim().length === 0 && !isLoading && (
+                      <TouchableOpacity 
+                        style={styles.submitButton}
+                        disabled={true}
+                      >
+                        <Ionicons 
+                          name="arrow-up-circle-outline" 
+                          size={32} 
+                          color={colors.placeholderText} 
+                        />
+                      </TouchableOpacity>
                     )}
                   </View>
-                  <View style={[styles.inputContainer, { backgroundColor: colors.background }]}> 
-                    <View style={styles.inputWrapper}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            backgroundColor: colors.inputBackground,
-                            color: colors.inputText,
-                            paddingRight: 48,
-                          }
-                        ]}
-                        placeholder={t('askAnything')}
-                        placeholderTextColor={colors.placeholderText}
-                        multiline
-                        value={text}
-                        onChangeText={setText}
-                        textAlignVertical="top"
-                        blurOnSubmit={false}
-                      />
-                      {text.trim().length > 0 && !isLoading && (
-                        <TouchableOpacity 
-                          style={styles.submitButton}
-                          onPress={handleSubmit}
-                        >
-                          <Ionicons 
-                            name="arrow-up-circle-sharp" 
-                            size={32} 
-                            color={colors.text} 
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {isLoading && (
-                        <TouchableOpacity style={styles.submitButton} disabled>
-                          <Ionicons
-                            name="arrow-up-circle-outline"
-                            size={32}
-                            color={colors.placeholderText}
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {text.trim().length === 0 && !isLoading && (
-                        <TouchableOpacity 
-                          style={styles.submitButton}
-                          disabled={true}
-                        >
-                          <Ionicons 
-                            name="arrow-up-circle-outline" 
-                            size={32} 
-                            color={colors.placeholderText} 
-                          />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
                 </View>
-              </SafeAreaView>
-            </View>
-          </TouchableWithoutFeedback>
+              </View>
+            </SafeAreaView>
+          </View>
         </KeyboardAvoidingView>
       </Animated.View>
     </>
@@ -1914,10 +2011,11 @@ function AppContent() {
 
 export default function Index() {
   const [showSplash, setShowSplash] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const checkNavigation = async () => {
+    const initialize = async () => {
       try {
         // Check if we're coming from language selection
         const fromLanguage = await AsyncStorage.getItem('fromLanguage');
@@ -1925,39 +2023,44 @@ export default function Index() {
           // Clear the flag and skip splash screen
           await AsyncStorage.removeItem('fromLanguage');
           setShowSplash(false);
+          setIsInitialized(true);
           return;
         }
         
         // Otherwise show splash screen
         const timer = setTimeout(() => {
           setShowSplash(false);
+          setIsInitialized(true);
           router.replace('/get-started');
         }, 1500);
         return () => clearTimeout(timer);
       } catch (error) {
-        console.error('Error checking navigation state:', error);
+        console.error('Error during initialization:', error);
         // Fallback to showing splash screen
         const timer = setTimeout(() => {
           setShowSplash(false);
+          setIsInitialized(true);
           router.replace('/get-started');
         }, 2000);
         return () => clearTimeout(timer);
       }
     };
 
-    checkNavigation();
+    initialize();
   }, []);
 
-  if (showSplash) {
+  if (showSplash || !isInitialized) {
     return <SplashScreen />;
   }
 
   return (
-    <ThemeProvider>
-      <TranslationProvider>
-        <AppContent />
-      </TranslationProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <TranslationProvider>
+          <AppContent />
+        </TranslationProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
