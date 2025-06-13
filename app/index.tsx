@@ -592,7 +592,7 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const { colors, toggleTheme } = useTheme();
   const flatListRef = useRef<FlatList>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -865,17 +865,19 @@ function AppContent() {
     }
   };
 
-  const handleSpeak = (text: string) => {
-    if (isSpeaking) {
-      // If currently speaking, stop it
+  const handleSpeak = (text: string, messageId: string) => {
+    if (speakingMessageId === messageId) {
+      // If currently speaking this message, stop it
       Speech.stop();
-      setIsSpeaking(false);
+      setSpeakingMessageId(null);
     } else {
-      // If not speaking, start it
+      // If another message is speaking, stop it before starting the new one.
+      Speech.stop();
+      // If not speaking, or speaking another message, start this one
       Speech.speak(text, {
-        onStart: () => setIsSpeaking(true),
-        onDone: () => setIsSpeaking(false),
-        onError: () => setIsSpeaking(false)
+        onStart: () => setSpeakingMessageId(messageId),
+        onDone: () => setSpeakingMessageId(null),
+        onError: () => setSpeakingMessageId(null),
       });
     }
   };
@@ -1615,14 +1617,14 @@ function AppContent() {
                     )}
                     {/* Text-to-Speech Icon */}
                     <Pressable
-                      onPress={() => handleSpeak(item.text)}
+                      onPress={() => handleSpeak(item.text, item.id)}
                       style={({ pressed }) => ([
                         styles.actionIcon,
                         pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
                       ])}
                     >
                       <Ionicons 
-                        name={isSpeaking ? "stop-circle-outline" : "volume-high-outline"} 
+                        name={speakingMessageId === item.id ? "stop-circle-outline" : "volume-high-outline"} 
                         size={18} 
                         color={colors.text} 
                       />
