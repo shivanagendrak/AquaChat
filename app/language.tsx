@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { Language } from '../i18n';
 
@@ -74,7 +74,7 @@ function LanguageSelectionContent() {
           style={styles.topImageFade}
         />
       </View>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.scrollContent}>
         <Text style={styles.title}>{t('chooseLanguage')}</Text>
         <Text style={styles.subtitle}>
           {t('chooseLanguageSubtitle')}
@@ -95,7 +95,7 @@ function LanguageSelectionContent() {
             </View>
           ))}
         </View>
-      </ScrollView>
+      </View>
       <TouchableOpacity
         style={[styles.continueButton, !selected && { opacity: 0.5 }]}
         onPress={handleContinue}
