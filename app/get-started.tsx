@@ -39,7 +39,7 @@ const { width, height } = Dimensions.get('window');
 const numColumns = 3;
 const baseTileSize = width / numColumns;
 const horizontalTileSize = baseTileSize * 1.5; // Increased horizontal size by 50%
-const verticalTileSize = baseTileSize * 1.5; // Keep the vertical size as is
+const verticalTileSize = baseTileSize * 2; // Increased from 1.5 to 2 for taller images
 const totalItems = originalImages.length;
 const ANIMATION_DURATION = 20000; // Reduced from 20000 to 8000 (8 seconds) for faster animation
 const GRID_ANGLE = 20; // Angle in degrees for the grid tilt
@@ -88,16 +88,6 @@ export default function GetStarted() {
     };
   }, [isAnimating, startAnimation]);
 
-  const onTouchStart = () => {
-    setIsAnimating(false);
-    translateY.stopAnimation();
-  };
-
-  const onTouchEnd = () => {
-    setIsAnimating(true);
-    startAnimation();
-  };
-
   const handleGetStarted = () => {
     router.replace('/language');
   };
@@ -140,8 +130,6 @@ export default function GetStarted() {
   return (
     <View
       style={styles.container}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
     >
       <View
         style={[
@@ -228,12 +216,12 @@ const styles = StyleSheet.create({
     lineHeight: 44,
   },
   description: {
-    fontSize: 18,
+    fontSize: 13.5,
     color: '#222',
     textAlign: 'center',
     marginBottom: 36,
     fontFamily: 'BricolageGrotesque-Regular',
-    lineHeight: 26,
+    lineHeight: 24,
   },
   button: {
     backgroundColor: '#20434A',
