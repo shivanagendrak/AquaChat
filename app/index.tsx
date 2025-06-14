@@ -680,6 +680,37 @@ function AppContent() {
 
   const handleSubmit = async () => {
     if (!text.trim() || isLoading) return;
+    
+    let chatId = currentChatId;
+    
+    // If there's no current chat, create one first
+    if (!chatId) {
+      const newChatId = Date.now().toString();
+      const newChat: Chat = {
+        id: newChatId,
+        title: 'New Chat',
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      
+      chatId = newChatId;
+      setCurrentChatId(newChatId);
+      
+      setChats(prevChats => {
+        const currentChats = Array.isArray(prevChats) ? prevChats : [];
+        const updatedChats = [newChat, ...currentChats];
+        
+        try {
+          saveChatsToStorage(updatedChats);
+        } catch (error) {
+          console.error('Error saving new chat:', error);
+        }
+        
+        return updatedChats;
+      });
+    }
+    
     const userMessage: Message = {
       id: Date.now().toString(),
       text: text.trim(),
@@ -692,7 +723,17 @@ function AppContent() {
     };
     const newMessages = [...messages, userMessage, loadingMessage];
     setMessages(newMessages);
-    updateCurrentChat(newMessages);
+    
+    // Update header title immediately for the first message
+    if (messages.length === 0) {
+      const title = userMessage.text.length > 30 
+        ? userMessage.text.slice(0, 30) + '...'
+        : userMessage.text;
+      setHeaderTitle(title);
+    }
+    
+    // Use the chat ID directly instead of relying on state
+    updateCurrentChatWithId(chatId, newMessages);
     setText("");
     setIsLoading(true);
     setError(null);
@@ -707,7 +748,7 @@ function AppContent() {
               ? { ...msg, text: response }
               : msg
           );
-          updateCurrentChat(updated);
+          updateCurrentChatWithId(chatId, updated);
           return updated;
         });
       } else {
@@ -717,7 +758,7 @@ function AppContent() {
               ? { ...msg, text: '' }
               : msg
           );
-          updateCurrentChat(updated);
+          updateCurrentChatWithId(chatId, updated);
           return updated;
         });
         // Streaming logic
@@ -734,7 +775,7 @@ function AppContent() {
                   ? { ...msg, text: currentText }
                   : msg
               );
-              updateCurrentChat(updated);
+              updateCurrentChatWithId(chatId, updated);
               return updated;
             });
             currentIndex++;
@@ -747,7 +788,7 @@ function AppContent() {
                   ? { ...msg, text: response, id: Date.now().toString() }
                   : msg
               );
-              updateCurrentChat(updated);
+              updateCurrentChatWithId(chatId, updated);
               return updated;
             });
           }
@@ -762,7 +803,7 @@ function AppContent() {
             ? { ...msg, text: errorMessage }
             : msg
         );
-        updateCurrentChat(updated);
+        updateCurrentChatWithId(chatId, updated);
         return updated;
       });
     } finally {
@@ -1729,18 +1770,16 @@ function AppContent() {
     updateHeaderTitle();
   }, [currentChatId, chats, messages]); // Update when any of these change
 
-  // Update the updateCurrentChat function
-  const updateCurrentChat = (newMessages: Message[]) => {
-    if (!currentChatId) return;
-    
+  // Helper function to update a specific chat by ID
+  const updateCurrentChatWithId = (chatId: string, newMessages: Message[]) => {
     setChats(prevChats => {
       // Ensure prevChats is an array
       const currentChats = Array.isArray(prevChats) ? prevChats : [];
       
-      // Find the index of the current chat
-      const chatIndex = currentChats.findIndex(chat => chat.id === currentChatId);
+      // Find the index of the chat
+      const chatIndex = currentChats.findIndex(chat => chat.id === chatId);
       if (chatIndex === -1) {
-        console.warn('Chat not found for update:', currentChatId);
+        console.warn('Chat not found for update:', chatId);
         return currentChats;
       }
 
@@ -1771,6 +1810,12 @@ function AppContent() {
 
       return updatedChats;
     });
+  };
+
+  // Update the updateCurrentChat function
+  const updateCurrentChat = (newMessages: Message[]) => {
+    if (!currentChatId) return;
+    updateCurrentChatWithId(currentChatId, newMessages);
   };
 
   // Update createNewChat to be more defensive
