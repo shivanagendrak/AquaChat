@@ -19,5 +19,7 @@
   "continue": "Continuer",
   "chooseLanguage": "Choisissez votre\nLangue Préférée",
   "chooseLanguageSubtitle": "Choisissez une langue pour commencer à discuter et obtenir des réponses instantanées à vos questions sur l'aquaculture.",
-  "appLanguage": "Langue de l'App"
+  "appLanguage": "Langue de l'App",
+  "noChats": "Aucun chat sauvegardé",
+  "noChatsFound": "Aucun chat trouvé"
 } 

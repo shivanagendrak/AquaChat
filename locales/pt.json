@@ -19,5 +19,7 @@
   "continue": "Continuar",
   "chooseLanguage": "Escolha seu\nIdioma Preferido",
   "chooseLanguageSubtitle": "Escolha um idioma para começar a conversar e obter respostas instantâneas para suas perguntas sobre aquicultura.",
-  "appLanguage": "Idioma do App"
+  "appLanguage": "Idioma do App",
+  "noChats": "Nenhum chat salvo",
+  "noChatsFound": "Nenhum chat encontrado"
 } 

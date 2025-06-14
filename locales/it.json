@@ -18,5 +18,8 @@
   "searchChats": "Cerca chat...",
   "continue": "Continua",
   "chooseLanguage": "Scegli la tua\nLingua Preferita",
-  "chooseLanguageSubtitle": "Scegli una lingua per iniziare a chattare e ottenere risposte immediate alle tue domande sull'acquacoltura."
+  "chooseLanguageSubtitle": "Scegli una lingua per iniziare a chattare e ottenere risposte immediate alle tue domande sull'acquacoltura.",
+  "appLanguage": "Lingua dell'App",
+  "noChats": "Nessuna chat salvata",
+  "noChatsFound": "Nessuna chat trovata"
 } 
