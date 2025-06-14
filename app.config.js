@@ -38,7 +38,8 @@ module.exports = {
       typedRoutes: true
     },
     extra: {
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY
     }
   }
 }; 
