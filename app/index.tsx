@@ -652,6 +652,7 @@ function AppContent() {
   const [headerTitle, setHeaderTitle] = useState('New Chat');
   const { t, language } = useAppTranslation();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showCopyForMessageId, setShowCopyForMessageId] = useState<string | null>(null);
 
   const headerStyles = StyleSheet.create({
     header: {
@@ -1009,351 +1010,378 @@ function AppContent() {
     return (
       <View style={[
         styles.messageContainer,
-        item.isUser ? styles.userMessage : styles.botMessage,
-        {
-          backgroundColor: item.isUser
-            ? colors.inputBackground
-            : item.text.startsWith('Error:')
-              ? '#ffebee'
-              : 'transparent'
-        }
+        item.isUser ? { alignSelf: 'flex-end' } : styles.botMessage,
       ]}>
         {item.isUser ? (
-          <Markdown
-            style={{
-              body: {
-                color: item.text.startsWith('Error:') ? '#d32f2f' : colors.text,
-                fontSize: 16,
-                lineHeight: 24,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                paddingRight: 0,
-                paddingLeft: 0,
-              },
-              heading1: {
-                fontSize: 28,
-                fontWeight: '700',
-                marginVertical: 20,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                color: colors.text,
-                letterSpacing: -0.5,
-              },
-              heading2: {
-                fontSize: 24,
-                fontWeight: '700',
-                marginVertical: 18,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                color: colors.text,
-                letterSpacing: -0.3,
-              },
-              heading3: {
-                fontSize: 20,
-                fontWeight: '600',
-                marginVertical: 16,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                color: colors.text,
-                letterSpacing: -0.2,
-              },
-              heading4: {
-                fontSize: 18,
-                fontWeight: '600',
-                marginVertical: 14,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                color: colors.text,
-              },
-              heading5: {
-                fontSize: 16,
-                fontWeight: '600',
-                marginVertical: 12,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                color: colors.text,
-              },
-              heading6: {
-                fontSize: 15,
-                fontWeight: '600',
-                marginVertical: 10,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                color: colors.text,
-              },
-              strong: {
-                fontWeight: '700',
-                color: colors.text,
-              },
-              em: {
-                fontStyle: 'italic',
-                color: colors.text,
-              },
-              s: {
-                textDecorationLine: 'line-through',
-                color: colors.text + '80',
-              },
-              u: {
-                textDecorationLine: 'underline',
-                color: colors.text,
-              },
-              blockquote: {
-                borderLeftWidth: 4,
-                borderLeftColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                paddingLeft: 16,
-                marginVertical: 12,
-                fontStyle: 'italic',
-                color: colors.text + 'CC',
-                backgroundColor: colors.background === '#fff' ? 'rgba(0, 102, 204, 0.05)' : 'rgba(102, 179, 255, 0.05)',
-                paddingVertical: 8,
-                paddingRight: 12,
-                borderRadius: 4,
-              },
-              code_inline: { 
-                backgroundColor: colors.background === '#fff' ? '#f5f5f5' : '#2a2a2a',
-                color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                padding: 4,
-                paddingHorizontal: 6,
-                borderRadius: 4,
-                fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                fontSize: 14,
-                lineHeight: 20,
-              },
-              code_block: {
-                backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                padding: 16,
-                borderRadius: 8,
-                fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                fontSize: 14,
-                lineHeight: 20,
-                marginVertical: 12,
-                borderWidth: 1,
-                borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-              },
-              fence: {
-                backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                padding: 16,
-                borderRadius: 8,
-                fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                fontSize: 14,
-                lineHeight: 20,
-                marginVertical: 12,
-                borderWidth: 1,
-                borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-              },
-              bullet_list: {
-                marginVertical: 12,
-                paddingLeft: 0,
-                width: '100%',
-              },
-              ordered_list: {
-                marginVertical: 12,
-                paddingLeft: 0,
-                width: '100%',
-              },
-              list_item: {
-                marginVertical: 8,
-                fontSize: 16,
-                lineHeight: 24,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                width: '100%',
-              },
-              bullet_list_item: {
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                marginVertical: 8,
-                paddingRight: 8,
-                width: '100%',
-              },
-              bullet_list_item_content: {
-                flex: 1,
-                fontSize: 16,
-                lineHeight: 24,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                paddingLeft: 12,
-              },
-              bullet_list_item_bullet: {
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                marginTop: 9,
-                marginRight: 12,
-              },
-              ordered_list_item: {
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                marginVertical: 8,
-                paddingRight: 8,
-                width: '100%',
-              },
-              ordered_list_item_content: {
-                flex: 1,
-                fontSize: 16,
-                lineHeight: 24,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                paddingLeft: 12,
-              },
-              ordered_list_item_number: {
-                fontSize: 16,
-                lineHeight: 24,
-                marginRight: 8,
-                color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                fontWeight: '600',
-                minWidth: 24,
-                textAlign: 'right',
-              },
-              task_list_item: {
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginVertical: 8,
-                paddingRight: 8,
-                width: '100%',
-              },
-              task_list_item_checkbox: {
-                width: 20,
-                height: 20,
-                borderRadius: 4,
-                borderWidth: 2,
-                borderColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                marginRight: 12,
-                marginTop: 2,
-              },
-              task_list_item_checked: {
-                backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-              },
-              link: {
-                color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                textDecorationLine: 'underline',
-                fontWeight: '500',
-              },
-              hr: {
-                backgroundColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                height: 1,
-                marginVertical: 20,
-                borderRadius: 1,
-              },
-              paragraph: {
-                marginVertical: 12,
-                fontSize: 16,
-                lineHeight: 24,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                color: colors.text,
-              },
-              details: {
-                marginVertical: 12,
-                padding: 12,
-                backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-              },
-              details_summary: {
-                fontWeight: '600',
-                color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                marginBottom: 8,
-              },
-              image: {
-                borderRadius: 8,
-                marginVertical: 12,
-              },
-              table: { 
-                marginVertical: 40,
-                borderWidth: 1,
-                borderColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                borderRadius: 20,
-                overflow: 'hidden',
-                backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
-                ...Platform.select({
-                  ios: {
-                    shadowColor: colors.background === '#fff' ? '#000' : '#fff',
-                    shadowOffset: { width: 0, height: 16 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 32,
+          <>
+            <TouchableOpacity 
+              style={[
+                styles.userMessage,
+                { backgroundColor: colors.inputBackground }
+              ]}
+              onPress={() => {
+                if (showCopyForMessageId === item.id) {
+                  setShowCopyForMessageId(null);
+                } else {
+                  setShowCopyForMessageId(item.id);
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Markdown
+                style={{
+                  body: {
+                    color: item.text.startsWith('Error:') ? '#d32f2f' : colors.text,
+                    fontSize: 16,
+                    lineHeight: 24,
+                    fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                    paddingRight: 0,
+                    paddingLeft: 0,
                   },
-                  android: {
-                    elevation: 8,
-                  },
-                }),
-              },
-              thead: {
-                backgroundColor: colors.background === '#fff' 
-                  ? '#fafafa'
-                  : '#1f1f1f',
-                borderBottomWidth: 1,
-                borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-              },
-              th: { 
-                color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
-                fontWeight: '600',
-                fontSize: 14,
-                padding: 28,
-                paddingVertical: 24,
-                borderRightWidth: 0,
-                backgroundColor: 'transparent',
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                textAlign: 'left',
-                letterSpacing: 0.2,
-                textTransform: 'uppercase',
-              },
-              th_first: {
-                paddingLeft: 32,
-              },
-              th_last: {
-                paddingRight: 32,
-              },
-              tr: { 
-                borderBottomWidth: 1,
-                borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                backgroundColor: 'transparent',
-              },
-              tr_last: {
-                borderBottomWidth: 0,
-              },
-              tr_even: {
-                backgroundColor: colors.background === '#fff' 
-                  ? '#fafafa'
-                  : '#1f1f1f',
-              },
-              tr_odd: {
-                backgroundColor: colors.background === '#fff'
-                  ? '#ffffff'
-                  : '#1a1a1a',
-              },
-              tr_hover: {
-                backgroundColor: colors.background === '#fff'
-                  ? '#f5f5f5'
-                  : '#252525',
-              },
-              td: { 
-                color: colors.text,
-                padding: 28,
-                paddingVertical: 24,
-                fontSize: 15,
-                backgroundColor: 'transparent',
-                borderRightWidth: 0,
-                fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                lineHeight: 24,
-                letterSpacing: 0.1,
-              },
-              td_first: {
-                fontWeight: '500',
-                paddingLeft: 32,
-                color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
-              },
-              td_last: {
-                paddingRight: 32,
-              },
-              table_wrapper: {
-                marginHorizontal: -16,
-                paddingHorizontal: 16,
-              },
-              table_container: {
-                backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
-                padding: 24,
-                borderRadius: 24,
-                marginVertical: 16,
-              },
-            }}
-            rules={solidBulletRule}
-          >
-            {item.text}
-          </Markdown>
+                heading1: {
+                  fontSize: 28,
+                  fontWeight: '700',
+                  marginVertical: 20,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+                  color: colors.text,
+                  letterSpacing: -0.5,
+                },
+                heading2: {
+                  fontSize: 24,
+                  fontWeight: '700',
+                  marginVertical: 18,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+                  color: colors.text,
+                  letterSpacing: -0.3,
+                },
+                heading3: {
+                  fontSize: 20,
+                  fontWeight: '600',
+                  marginVertical: 16,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+                  color: colors.text,
+                  letterSpacing: -0.2,
+                },
+                heading4: {
+                  fontSize: 18,
+                  fontWeight: '600',
+                  marginVertical: 14,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+                  color: colors.text,
+                },
+                heading5: {
+                  fontSize: 16,
+                  fontWeight: '600',
+                  marginVertical: 12,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+                  color: colors.text,
+                },
+                heading6: {
+                  fontSize: 15,
+                  fontWeight: '600',
+                  marginVertical: 10,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+                  color: colors.text,
+                },
+                strong: {
+                  fontWeight: '700',
+                  color: colors.text,
+                },
+                em: {
+                  fontStyle: 'italic',
+                  color: colors.text,
+                },
+                s: {
+                  textDecorationLine: 'line-through',
+                  color: colors.text + '80',
+                },
+                u: {
+                  textDecorationLine: 'underline',
+                  color: colors.text,
+                },
+                blockquote: {
+                  borderLeftWidth: 4,
+                  borderLeftColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  paddingLeft: 16,
+                  marginVertical: 12,
+                  fontStyle: 'italic',
+                  color: colors.text + 'CC',
+                  backgroundColor: colors.background === '#fff' ? 'rgba(0, 102, 204, 0.05)' : 'rgba(102, 179, 255, 0.05)',
+                  paddingVertical: 8,
+                  paddingRight: 12,
+                  borderRadius: 4,
+                },
+                code_inline: { 
+                  backgroundColor: colors.background === '#fff' ? '#f5f5f5' : '#2a2a2a',
+                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  padding: 4,
+                  paddingHorizontal: 6,
+                  borderRadius: 4,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
+                  fontSize: 14,
+                  lineHeight: 20,
+                },
+                code_block: {
+                  backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
+                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  padding: 16,
+                  borderRadius: 8,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
+                  fontSize: 14,
+                  lineHeight: 20,
+                  marginVertical: 12,
+                  borderWidth: 1,
+                  borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
+                },
+                fence: {
+                  backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
+                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  padding: 16,
+                  borderRadius: 8,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
+                  fontSize: 14,
+                  lineHeight: 20,
+                  marginVertical: 12,
+                  borderWidth: 1,
+                  borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
+                },
+                bullet_list: {
+                  marginVertical: 12,
+                  paddingLeft: 0,
+                  width: '100%',
+                },
+                ordered_list: {
+                  marginVertical: 12,
+                  paddingLeft: 0,
+                  width: '100%',
+                },
+                list_item: {
+                  marginVertical: 8,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                  width: '100%',
+                },
+                bullet_list_item: {
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  marginVertical: 8,
+                  paddingRight: 8,
+                  width: '100%',
+                },
+                bullet_list_item_content: {
+                  flex: 1,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                  paddingLeft: 12,
+                },
+                bullet_list_item_bullet: {
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  marginTop: 9,
+                  marginRight: 12,
+                },
+                ordered_list_item: {
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  marginVertical: 8,
+                  paddingRight: 8,
+                  width: '100%',
+                },
+                ordered_list_item_content: {
+                  flex: 1,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                  paddingLeft: 12,
+                },
+                ordered_list_item_number: {
+                  fontSize: 16,
+                  lineHeight: 24,
+                  marginRight: 8,
+                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  fontWeight: '600',
+                  minWidth: 24,
+                  textAlign: 'right',
+                },
+                task_list_item: {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginVertical: 8,
+                  paddingRight: 8,
+                  width: '100%',
+                },
+                task_list_item_checkbox: {
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  marginRight: 12,
+                  marginTop: 2,
+                },
+                task_list_item_checked: {
+                  backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                },
+                link: {
+                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  textDecorationLine: 'underline',
+                  fontWeight: '500',
+                },
+                hr: {
+                  backgroundColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
+                  height: 1,
+                  marginVertical: 20,
+                  borderRadius: 1,
+                },
+                paragraph: {
+                  marginVertical: 12,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                  color: colors.text,
+                },
+                details: {
+                  marginVertical: 12,
+                  padding: 12,
+                  backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
+                },
+                details_summary: {
+                  fontWeight: '600',
+                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
+                  marginBottom: 8,
+                },
+                image: {
+                  borderRadius: 8,
+                  marginVertical: 12,
+                },
+                table: { 
+                  marginVertical: 40,
+                  borderWidth: 1,
+                  borderColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                  backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
+                  ...Platform.select({
+                    ios: {
+                      shadowColor: colors.background === '#fff' ? '#000' : '#fff',
+                      shadowOffset: { width: 0, height: 16 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 32,
+                    },
+                    android: {
+                      elevation: 8,
+                    },
+                  }),
+                },
+                thead: {
+                  backgroundColor: colors.background === '#fff' 
+                    ? '#fafafa'
+                    : '#1f1f1f',
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
+                },
+                th: { 
+                  color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
+                  fontWeight: '600',
+                  fontSize: 14,
+                  padding: 28,
+                  paddingVertical: 24,
+                  borderRightWidth: 0,
+                  backgroundColor: 'transparent',
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+                  textAlign: 'left',
+                  letterSpacing: 0.2,
+                  textTransform: 'uppercase',
+                },
+                th_first: {
+                  paddingLeft: 32,
+                },
+                th_last: {
+                  paddingRight: 32,
+                },
+                tr: { 
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
+                  backgroundColor: 'transparent',
+                },
+                tr_last: {
+                  borderBottomWidth: 0,
+                },
+                tr_even: {
+                  backgroundColor: colors.background === '#fff' 
+                    ? '#fafafa'
+                    : '#1f1f1f',
+                },
+                tr_odd: {
+                  backgroundColor: colors.background === '#fff'
+                    ? '#ffffff'
+                    : '#1a1a1a',
+                },
+                tr_hover: {
+                  backgroundColor: colors.background === '#fff'
+                    ? '#f5f5f5'
+                    : '#252525',
+                },
+                td: { 
+                  color: colors.text,
+                  padding: 28,
+                  paddingVertical: 24,
+                  fontSize: 15,
+                  backgroundColor: 'transparent',
+                  borderRightWidth: 0,
+                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                  lineHeight: 24,
+                  letterSpacing: 0.1,
+                },
+                td_first: {
+                  fontWeight: '500',
+                  paddingLeft: 32,
+                  color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
+                },
+                td_last: {
+                  paddingRight: 32,
+                },
+                table_wrapper: {
+                  marginHorizontal: -16,
+                  paddingHorizontal: 16,
+                },
+                table_container: {
+                  backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
+                  padding: 24,
+                  borderRadius: 24,
+                  marginVertical: 16,
+                },
+              }}
+              rules={solidBulletRule}
+            >
+              {item.text}
+            </Markdown>
+            </TouchableOpacity>
+            {/* Copy Icon for User Messages - Only show when message is touched */}
+            {showCopyForMessageId === item.id && (
+              <View style={[styles.actionIconsContainer, { justifyContent: 'flex-end' }]}>
+                <Pressable
+                  onPress={() => {
+                    handleCopy(item.text);
+                    setShowCopyForMessageId(null); // Hide after copying
+                  }}
+                  style={({ pressed }) => ([
+                    styles.actionIcon,
+                    pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                  ])}
+                >
+                  <Ionicons name="copy-outline" size={18} color={colors.text} />
+                </Pressable>
+              </View>
+            )}
+          </>
         ) : (
           <>
             {item.text === "thinking" ? (
@@ -2054,6 +2082,8 @@ function AppContent() {
                         paddingVertical: 8,
                         paddingBottom: 48,
                       }}
+                      scrollEnabled={true}
+                      onScrollBeginDrag={() => setShowCopyForMessageId(null)}
                     />
                   )}
                 </View>
@@ -2241,8 +2271,8 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingLeft: 12,
     maxWidth: '80%',
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingTop: 2,
+    paddingBottom: 2,
     borderRadius: 22,
     backgroundColor: '#0066CC',
     color: '#fff',
