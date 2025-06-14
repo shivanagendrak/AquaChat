@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { Ionicons, MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, MaterialIcons, SimpleLineIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Clipboard from 'expo-clipboard';
@@ -1649,7 +1649,8 @@ function AppContent() {
                         {
                           backgroundColor: colors.inputBackground,
                           color: colors.inputText,
-                          paddingRight: 48,
+                          paddingRight: 48, // Back to single button width
+                          paddingLeft: 16,
                         }
                       ]}
                       placeholder={t('askAnything')}
@@ -1660,19 +1661,10 @@ function AppContent() {
                       textAlignVertical="top"
                       blurOnSubmit={false}
                     />
-                    {text.trim().length > 0 && !isLoading && !isStreaming && (
-                      <TouchableOpacity 
-                        style={styles.submitButton}
-                        onPress={handleSubmit}
-                      >
-                        <Ionicons 
-                          name="arrow-up-circle-sharp" 
-                          size={32} 
-                          color={colors.text} 
-                        />
-                      </TouchableOpacity>
-                    )}
-                    {(isLoading || isStreaming) && (
+                    
+                    {/* Smart Button Logic */}
+                    {(isLoading || isStreaming) ? (
+                      // Show Stop Button when API is responding
                       <TouchableOpacity 
                         style={styles.submitButton} 
                         onPress={handleStopGeneration}
@@ -1683,16 +1675,31 @@ function AppContent() {
                           color={colors.text}
                         />
                       </TouchableOpacity>
-                    )}
-                    {text.trim().length === 0 && !isLoading && !isStreaming && (
+                    ) : text.trim().length > 0 ? (
+                      // Show Submit Button when user has typed text
                       <TouchableOpacity 
                         style={styles.submitButton}
-                        disabled={true}
+                        onPress={handleSubmit}
                       >
                         <Ionicons 
-                          name="arrow-up-circle-outline" 
+                          name="arrow-up-circle-sharp" 
                           size={32} 
-                          color={colors.placeholderText} 
+                          color={colors.text} 
+                        />
+                      </TouchableOpacity>
+                    ) : (
+                      // Show Mic Button when input is empty
+                      <TouchableOpacity 
+                        style={[styles.submitButton, { bottom: 6 }]}
+                        onPress={() => {
+                          // TODO: Add voice input functionality
+                          console.log('Mic button pressed - ready for voice input');
+                        }}
+                      >
+                        <MaterialIcons 
+                          name="mic" 
+                          size={24} 
+                          color={colors.text} 
                         />
                       </TouchableOpacity>
                     )}
