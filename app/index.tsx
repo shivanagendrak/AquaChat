@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { Ionicons, SimpleLineIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
@@ -643,6 +643,7 @@ function AppContent() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const { colors, toggleTheme } = useTheme();
   const flatListRef = useRef<FlatList>(null);
+  const streamIntervalRef = useRef<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [chats, setChats] = useState<Chat[]>([]); // Initialize as empty array
@@ -681,6 +682,15 @@ function AppContent() {
     inputRange: [0, 1],
     outputRange: [0, menuWidth],
   });
+
+  const handleStopGeneration = () => {
+    if (streamIntervalRef.current) {
+      clearInterval(streamIntervalRef.current);
+      streamIntervalRef.current = null;
+    }
+    setIsLoading(false);
+    setIsStreaming(false);
+  };
 
   const streamText = (text: string) => {
     const words = text.split(/(\s+)/);
@@ -814,7 +824,7 @@ function AppContent() {
         let currentIndex = 0;
         let currentText = '';
         setIsStreaming(true);
-        const streamInterval = setInterval(() => {
+        streamIntervalRef.current = setInterval(() => {
           if (currentIndex < words.length) {
             currentText += words[currentIndex];
             setMessages(prev => {
@@ -828,7 +838,10 @@ function AppContent() {
             });
             currentIndex++;
           } else {
-            clearInterval(streamInterval);
+            if (streamIntervalRef.current) {
+              clearInterval(streamIntervalRef.current);
+              streamIntervalRef.current = null;
+            }
             setIsStreaming(false);
             setMessages(prev => {
               const updated = prev.map(msg =>
@@ -906,7 +919,7 @@ function AppContent() {
               let currentIndex = 0;
               let currentText = '';
               setIsStreaming(true);
-              const streamInterval = setInterval(() => {
+              streamIntervalRef.current = setInterval(() => {
                 if (currentIndex < words.length) {
                   currentText += words[currentIndex];
                   setMessages(prev => {
@@ -920,7 +933,10 @@ function AppContent() {
                   });
                   currentIndex++;
                 } else {
-                  clearInterval(streamInterval);
+                  if (streamIntervalRef.current) {
+                    clearInterval(streamIntervalRef.current);
+                    streamIntervalRef.current = null;
+                  }
                   setIsStreaming(false);
                   setMessages(prev => {
                     const updated = prev.map(msg =>
@@ -2060,7 +2076,7 @@ function AppContent() {
                       textAlignVertical="top"
                       blurOnSubmit={false}
                     />
-                    {text.trim().length > 0 && !isLoading && (
+                    {text.trim().length > 0 && !isLoading && !isStreaming && (
                       <TouchableOpacity 
                         style={styles.submitButton}
                         onPress={handleSubmit}
@@ -2072,16 +2088,19 @@ function AppContent() {
                         />
                       </TouchableOpacity>
                     )}
-                    {isLoading && (
-                      <TouchableOpacity style={styles.submitButton} disabled>
-                        <Ionicons
-                          name="arrow-up-circle-outline"
+                    {(isLoading || isStreaming) && (
+                      <TouchableOpacity 
+                        style={styles.submitButton} 
+                        onPress={handleStopGeneration}
+                      >
+                        <MaterialCommunityIcons
+                          name="stop-circle"
                           size={32}
-                          color={colors.placeholderText}
+                          color={colors.text}
                         />
                       </TouchableOpacity>
                     )}
-                    {text.trim().length === 0 && !isLoading && (
+                    {text.trim().length === 0 && !isLoading && !isStreaming && (
                       <TouchableOpacity 
                         style={styles.submitButton}
                         disabled={true}
