@@ -1,8 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Ionicons, MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
+import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -82,6 +84,87 @@ async function generateResponse(prompt: string, language: string): Promise<strin
   }
 }
 
+// Simple cache for TTS audio files
+const ttsCache = new Map<string, string>();
+
+// ElevenLabs Text-to-Speech function
+async function generateElevenLabsSpeech(text: string): Promise<string | null> {
+  // Check cache first
+  const cacheKey = text.slice(0, 100); // Use first 100 chars as cache key
+  if (ttsCache.has(cacheKey)) {
+    const cachedUri = ttsCache.get(cacheKey)!;
+    // Check if file still exists
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(cachedUri);
+      if (fileInfo.exists) {
+        return cachedUri;
+      } else {
+        ttsCache.delete(cacheKey);
+      }
+    } catch (error) {
+      ttsCache.delete(cacheKey);
+    }
+  }
+  try {
+    // You'll need to get your ElevenLabs API key from https://elevenlabs.io/
+    const ELEVENLABS_API_KEY = Constants.expoConfig?.extra?.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY;
+    
+    if (!ELEVENLABS_API_KEY) {
+      console.warn('ElevenLabs API key not found, falling back to system TTS');
+      return null;
+    }
+
+    // Using Rachel voice (you can change this to any voice ID you prefer)
+    const VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Rachel voice
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVENLABS_API_KEY,
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: "eleven_monolingual_v1",
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.5,
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`ElevenLabs API error: ${response.status}`);
+    }
+
+    // Save audio to temporary file
+    const fileName = `elevenlabs_${Date.now()}.mp3`;
+    const fileUri = FileSystem.documentDirectory + fileName;
+    
+    // Get the audio data as ArrayBuffer
+    const audioBuffer = await response.arrayBuffer();
+    
+    // Convert ArrayBuffer to Uint8Array and then to base64 string
+    const uint8Array = new Uint8Array(audioBuffer);
+    const binaryString = uint8Array.reduce((data, byte) => data + String.fromCharCode(byte), '');
+    const base64Audio = btoa(binaryString);
+    
+    // Write the file
+    await FileSystem.writeAsStringAsync(fileUri, base64Audio, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    // Cache the file URI
+    ttsCache.set(cacheKey, fileUri);
+    
+    return fileUri;
+  } catch (error) {
+    console.error('Error generating ElevenLabs speech:', error);
+    return null;
+  }
+}
+
 // Custom solid bullet rule for Markdown
 const solidBulletRule = {
   bullet_list_item: (node: any, children: any, parent: any, styles: any) => {
@@ -103,6 +186,44 @@ const solidBulletRule = {
       </View>
     );
   },
+};
+
+// Add the LoadingDot component for TTS loading
+const LoadingDot = ({ color }: { color: string }) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  const animate = useCallback(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [opacity]);
+
+  useEffect(() => {
+    animate();
+    return () => {
+      opacity.stopAnimation();
+    };
+  }, [animate, opacity]);
+
+  return (
+    <View style={styles.loadingSpinner}>
+      <Animated.View style={[
+        styles.spinnerDot,
+        { backgroundColor: color, opacity }
+      ]} />
+    </View>
+  );
 };
 
 // Add the ThinkingText component
@@ -641,6 +762,7 @@ function AppContent() {
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [loadingTTSMessageId, setLoadingTTSMessageId] = useState<string | null>(null);
   const { colors, toggleTheme } = useTheme();
   const flatListRef = useRef<FlatList>(null);
   const streamIntervalRef = useRef<number | null>(null);
@@ -653,6 +775,7 @@ function AppContent() {
   const { t, language } = useAppTranslation();
   const [isInitialized, setIsInitialized] = useState(false);
   const [showCopyForMessageId, setShowCopyForMessageId] = useState<string | null>(null);
+  const [currentSound, setCurrentSound] = useState<any>(null);
 
   const headerStyles = StyleSheet.create({
     header: {
@@ -971,20 +1094,76 @@ function AppContent() {
     }
   };
 
-  const handleSpeak = (text: string, messageId: string) => {
+    const handleSpeak = async (text: string, messageId: string) => {
     if (speakingMessageId === messageId) {
       // If currently speaking this message, stop it
-      Speech.stop();
+      if (currentSound) {
+        await currentSound.stopAsync();
+        await currentSound.unloadAsync();
+        setCurrentSound(null);
+      }
+      Speech.stop(); // Also stop system TTS if running
       setSpeakingMessageId(null);
+      setLoadingTTSMessageId(null);
     } else {
-      // If another message is speaking, stop it before starting the new one.
-      Speech.stop();
-      // If not speaking, or speaking another message, start this one
-      Speech.speak(text, {
-        onStart: () => setSpeakingMessageId(messageId),
-        onDone: () => setSpeakingMessageId(null),
-        onError: () => setSpeakingMessageId(null),
-      });
+      // Stop any currently playing audio
+      if (currentSound) {
+        await currentSound.stopAsync();
+        await currentSound.unloadAsync();
+        setCurrentSound(null);
+      }
+      Speech.stop(); // Also stop system TTS if running
+      
+      // Show loading indicator
+      setLoadingTTSMessageId(messageId);
+      setSpeakingMessageId(null);
+      
+      try {
+        // Try ElevenLabs first
+        const audioUri = await generateElevenLabsSpeech(text);
+        
+        // Hide loading indicator
+        setLoadingTTSMessageId(null);
+        
+        if (audioUri) {
+          // Play ElevenLabs audio
+          setSpeakingMessageId(messageId);
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: audioUri },
+            { shouldPlay: true }
+          );
+          
+          setCurrentSound(sound);
+          
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.isLoaded && status.didJustFinish) {
+              setSpeakingMessageId(null);
+              setCurrentSound(null);
+              sound.unloadAsync();
+              // Clean up the temporary file
+              FileSystem.deleteAsync(audioUri, { idempotent: true });
+            }
+          });
+        } else {
+          // Fallback to system TTS
+          setSpeakingMessageId(messageId);
+          Speech.speak(text, {
+            onStart: () => setSpeakingMessageId(messageId),
+            onDone: () => setSpeakingMessageId(null),
+            onError: () => setSpeakingMessageId(null),
+          });
+        }
+      } catch (error) {
+        console.error('Error playing ElevenLabs audio:', error);
+        setLoadingTTSMessageId(null);
+        // Fallback to system TTS
+        setSpeakingMessageId(messageId);
+        Speech.speak(text, {
+          onStart: () => setSpeakingMessageId(messageId),
+          onDone: () => setSpeakingMessageId(null),
+          onError: () => setSpeakingMessageId(null),
+        });
+      }
     }
   };
 
@@ -999,791 +1178,11 @@ function AppContent() {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const renderMessage = ({ item, index }: { item: Message, index: number }) => {
-    // Determine if this is the last message and is currently streaming
-    const isLastBotMessage =
-      !item.isUser &&
-      index === messages.length - 1 &&
-      isStreaming &&
-      item.id.startsWith('streaming-');
-
-    return (
-      <View style={[
-        styles.messageContainer,
-        item.isUser ? { alignSelf: 'flex-end' } : styles.botMessage,
-      ]}>
-        {item.isUser ? (
-          <>
-            <TouchableOpacity 
-              style={[
-                styles.userMessage,
-                { backgroundColor: colors.inputBackground }
-              ]}
-              onPress={() => {
-                if (showCopyForMessageId === item.id) {
-                  setShowCopyForMessageId(null);
-                } else {
-                  setShowCopyForMessageId(item.id);
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Markdown
-                style={{
-                  body: {
-                    color: item.text.startsWith('Error:') ? '#d32f2f' : colors.text,
-                    fontSize: 16,
-                    lineHeight: 24,
-                    fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                    paddingRight: 0,
-                    paddingLeft: 0,
-                  },
-                heading1: {
-                  fontSize: 28,
-                  fontWeight: '700',
-                  marginVertical: 20,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                  color: colors.text,
-                  letterSpacing: -0.5,
-                },
-                heading2: {
-                  fontSize: 24,
-                  fontWeight: '700',
-                  marginVertical: 18,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                  color: colors.text,
-                  letterSpacing: -0.3,
-                },
-                heading3: {
-                  fontSize: 20,
-                  fontWeight: '600',
-                  marginVertical: 16,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                  color: colors.text,
-                  letterSpacing: -0.2,
-                },
-                heading4: {
-                  fontSize: 18,
-                  fontWeight: '600',
-                  marginVertical: 14,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                  color: colors.text,
-                },
-                heading5: {
-                  fontSize: 16,
-                  fontWeight: '600',
-                  marginVertical: 12,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                  color: colors.text,
-                },
-                heading6: {
-                  fontSize: 15,
-                  fontWeight: '600',
-                  marginVertical: 10,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                  color: colors.text,
-                },
-                strong: {
-                  fontWeight: '700',
-                  color: colors.text,
-                },
-                em: {
-                  fontStyle: 'italic',
-                  color: colors.text,
-                },
-                s: {
-                  textDecorationLine: 'line-through',
-                  color: colors.text + '80',
-                },
-                u: {
-                  textDecorationLine: 'underline',
-                  color: colors.text,
-                },
-                blockquote: {
-                  borderLeftWidth: 4,
-                  borderLeftColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  paddingLeft: 16,
-                  marginVertical: 12,
-                  fontStyle: 'italic',
-                  color: colors.text + 'CC',
-                  backgroundColor: colors.background === '#fff' ? 'rgba(0, 102, 204, 0.05)' : 'rgba(102, 179, 255, 0.05)',
-                  paddingVertical: 8,
-                  paddingRight: 12,
-                  borderRadius: 4,
-                },
-                code_inline: { 
-                  backgroundColor: colors.background === '#fff' ? '#f5f5f5' : '#2a2a2a',
-                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  padding: 4,
-                  paddingHorizontal: 6,
-                  borderRadius: 4,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                  fontSize: 14,
-                  lineHeight: 20,
-                },
-                code_block: {
-                  backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  padding: 16,
-                  borderRadius: 8,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                  fontSize: 14,
-                  lineHeight: 20,
-                  marginVertical: 12,
-                  borderWidth: 1,
-                  borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                },
-                fence: {
-                  backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  padding: 16,
-                  borderRadius: 8,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                  fontSize: 14,
-                  lineHeight: 20,
-                  marginVertical: 12,
-                  borderWidth: 1,
-                  borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                },
-                bullet_list: {
-                  marginVertical: 12,
-                  paddingLeft: 0,
-                  width: '100%',
-                },
-                ordered_list: {
-                  marginVertical: 12,
-                  paddingLeft: 0,
-                  width: '100%',
-                },
-                list_item: {
-                  marginVertical: 8,
-                  fontSize: 16,
-                  lineHeight: 24,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                  width: '100%',
-                },
-                bullet_list_item: {
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                  marginVertical: 8,
-                  paddingRight: 8,
-                  width: '100%',
-                },
-                bullet_list_item_content: {
-                  flex: 1,
-                  fontSize: 16,
-                  lineHeight: 24,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                  paddingLeft: 12,
-                },
-                bullet_list_item_bullet: {
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  marginTop: 9,
-                  marginRight: 12,
-                },
-                ordered_list_item: {
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                  marginVertical: 8,
-                  paddingRight: 8,
-                  width: '100%',
-                },
-                ordered_list_item_content: {
-                  flex: 1,
-                  fontSize: 16,
-                  lineHeight: 24,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                  paddingLeft: 12,
-                },
-                ordered_list_item_number: {
-                  fontSize: 16,
-                  lineHeight: 24,
-                  marginRight: 8,
-                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  fontWeight: '600',
-                  minWidth: 24,
-                  textAlign: 'right',
-                },
-                task_list_item: {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginVertical: 8,
-                  paddingRight: 8,
-                  width: '100%',
-                },
-                task_list_item_checkbox: {
-                  width: 20,
-                  height: 20,
-                  borderRadius: 4,
-                  borderWidth: 2,
-                  borderColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  marginRight: 12,
-                  marginTop: 2,
-                },
-                task_list_item_checked: {
-                  backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                },
-                link: {
-                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  textDecorationLine: 'underline',
-                  fontWeight: '500',
-                },
-                hr: {
-                  backgroundColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                  height: 1,
-                  marginVertical: 20,
-                  borderRadius: 1,
-                },
-                paragraph: {
-                  marginVertical: 12,
-                  fontSize: 16,
-                  lineHeight: 24,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                  color: colors.text,
-                },
-                details: {
-                  marginVertical: 12,
-                  padding: 12,
-                  backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                },
-                details_summary: {
-                  fontWeight: '600',
-                  color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                  marginBottom: 8,
-                },
-                image: {
-                  borderRadius: 8,
-                  marginVertical: 12,
-                },
-                table: { 
-                  marginVertical: 40,
-                  borderWidth: 1,
-                  borderColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                  borderRadius: 20,
-                  overflow: 'hidden',
-                  backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
-                  ...Platform.select({
-                    ios: {
-                      shadowColor: colors.background === '#fff' ? '#000' : '#fff',
-                      shadowOffset: { width: 0, height: 16 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 32,
-                    },
-                    android: {
-                      elevation: 8,
-                    },
-                  }),
-                },
-                thead: {
-                  backgroundColor: colors.background === '#fff' 
-                    ? '#fafafa'
-                    : '#1f1f1f',
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                },
-                th: { 
-                  color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
-                  fontWeight: '600',
-                  fontSize: 14,
-                  padding: 28,
-                  paddingVertical: 24,
-                  borderRightWidth: 0,
-                  backgroundColor: 'transparent',
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                  textAlign: 'left',
-                  letterSpacing: 0.2,
-                  textTransform: 'uppercase',
-                },
-                th_first: {
-                  paddingLeft: 32,
-                },
-                th_last: {
-                  paddingRight: 32,
-                },
-                tr: { 
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                  backgroundColor: 'transparent',
-                },
-                tr_last: {
-                  borderBottomWidth: 0,
-                },
-                tr_even: {
-                  backgroundColor: colors.background === '#fff' 
-                    ? '#fafafa'
-                    : '#1f1f1f',
-                },
-                tr_odd: {
-                  backgroundColor: colors.background === '#fff'
-                    ? '#ffffff'
-                    : '#1a1a1a',
-                },
-                tr_hover: {
-                  backgroundColor: colors.background === '#fff'
-                    ? '#f5f5f5'
-                    : '#252525',
-                },
-                td: { 
-                  color: colors.text,
-                  padding: 28,
-                  paddingVertical: 24,
-                  fontSize: 15,
-                  backgroundColor: 'transparent',
-                  borderRightWidth: 0,
-                  fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                  lineHeight: 24,
-                  letterSpacing: 0.1,
-                },
-                td_first: {
-                  fontWeight: '500',
-                  paddingLeft: 32,
-                  color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
-                },
-                td_last: {
-                  paddingRight: 32,
-                },
-                table_wrapper: {
-                  marginHorizontal: -16,
-                  paddingHorizontal: 16,
-                },
-                table_container: {
-                  backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
-                  padding: 24,
-                  borderRadius: 24,
-                  marginVertical: 16,
-                },
-              }}
-              rules={solidBulletRule}
-            >
-              {item.text}
-            </Markdown>
-            </TouchableOpacity>
-            {/* Copy Icon for User Messages - Only show when message is touched */}
-            {showCopyForMessageId === item.id && (
-              <View style={[styles.actionIconsContainer, { justifyContent: 'flex-end' }]}>
-                <Pressable
-                  onPress={() => {
-                    handleCopy(item.text);
-                    setShowCopyForMessageId(null); // Hide after copying
-                  }}
-                  style={({ pressed }) => ([
-                    styles.actionIcon,
-                    pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
-                  ])}
-                >
-                  <Ionicons name="copy-outline" size={18} color={colors.text} />
-                </Pressable>
-              </View>
-            )}
-          </>
-        ) : (
-          <>
-            {item.text === "thinking" ? (
-              <ThinkingText />
-            ) : (
-              <View style={styles.botMessageContent}>
-                <Markdown
-                  style={{
-                    body: {
-                      color: item.text.startsWith('Error:') ? '#d32f2f' : colors.text,
-                      fontSize: 16,
-                      lineHeight: 24,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                      paddingRight: 0,
-                      paddingLeft: 0,
-                    },
-                    heading1: {
-                      fontSize: 28,
-                      fontWeight: '700',
-                      marginVertical: 20,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                      color: colors.text,
-                      letterSpacing: -0.5,
-                    },
-                    heading2: {
-                      fontSize: 24,
-                      fontWeight: '700',
-                      marginVertical: 18,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                      color: colors.text,
-                      letterSpacing: -0.3,
-                    },
-                    heading3: {
-                      fontSize: 20,
-                      fontWeight: '600',
-                      marginVertical: 16,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                      color: colors.text,
-                      letterSpacing: -0.2,
-                    },
-                    heading4: {
-                      fontSize: 18,
-                      fontWeight: '600',
-                      marginVertical: 14,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                      color: colors.text,
-                    },
-                    heading5: {
-                      fontSize: 16,
-                      fontWeight: '600',
-                      marginVertical: 12,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                      color: colors.text,
-                    },
-                    heading6: {
-                      fontSize: 15,
-                      fontWeight: '600',
-                      marginVertical: 10,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                      color: colors.text,
-                    },
-                    strong: {
-                      fontWeight: '700',
-                      color: colors.text,
-                    },
-                    em: {
-                      fontStyle: 'italic',
-                      color: colors.text,
-                    },
-                    s: {
-                      textDecorationLine: 'line-through',
-                      color: colors.text + '80',
-                    },
-                    u: {
-                      textDecorationLine: 'underline',
-                      color: colors.text,
-                    },
-                    blockquote: {
-                      borderLeftWidth: 4,
-                      borderLeftColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      paddingLeft: 16,
-                      marginVertical: 12,
-                      fontStyle: 'italic',
-                      color: colors.text + 'CC',
-                      backgroundColor: colors.background === '#fff' ? 'rgba(0, 102, 204, 0.05)' : 'rgba(102, 179, 255, 0.05)',
-                      paddingVertical: 8,
-                      paddingRight: 12,
-                      borderRadius: 4,
-                    },
-                    code_inline: { 
-                      backgroundColor: colors.background === '#fff' ? '#f5f5f5' : '#2a2a2a',
-                      color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      padding: 4,
-                      paddingHorizontal: 6,
-                      borderRadius: 4,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                      fontSize: 14,
-                      lineHeight: 20,
-                    },
-                    code_block: {
-                      backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                      color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      padding: 16,
-                      borderRadius: 8,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                      fontSize: 14,
-                      lineHeight: 20,
-                      marginVertical: 12,
-                      borderWidth: 1,
-                      borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                    },
-                    fence: {
-                      backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                      color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      padding: 16,
-                      borderRadius: 8,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono',
-                      fontSize: 14,
-                      lineHeight: 20,
-                      marginVertical: 12,
-                      borderWidth: 1,
-                      borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                    },
-                    bullet_list: {
-                      marginVertical: 12,
-                      paddingLeft: 0,
-                      width: '100%',
-                    },
-                    ordered_list: {
-                      marginVertical: 12,
-                      paddingLeft: 0,
-                      width: '100%',
-                    },
-                    list_item: {
-                      marginVertical: 8,
-                      fontSize: 16,
-                      lineHeight: 24,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                      width: '100%',
-                    },
-                    bullet_list_item: {
-                      flexDirection: 'row',
-                      alignItems: 'flex-start',
-                      marginVertical: 8,
-                      paddingRight: 8,
-                      width: '100%',
-                    },
-                    bullet_list_item_content: {
-                      flex: 1,
-                      fontSize: 16,
-                      lineHeight: 24,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                      paddingLeft: 12,
-                    },
-                    bullet_list_item_bullet: {
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      marginTop: 9,
-                      marginRight: 12,
-                    },
-                    ordered_list_item: {
-                      flexDirection: 'row',
-                      alignItems: 'flex-start',
-                      marginVertical: 8,
-                      paddingRight: 8,
-                      width: '100%',
-                    },
-                    ordered_list_item_content: {
-                      flex: 1,
-                      fontSize: 16,
-                      lineHeight: 24,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                      paddingLeft: 12,
-                    },
-                    ordered_list_item_number: {
-                      fontSize: 16,
-                      lineHeight: 24,
-                      marginRight: 8,
-                      color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      fontWeight: '600',
-                      minWidth: 24,
-                      textAlign: 'right',
-                    },
-                    task_list_item: {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginVertical: 8,
-                      paddingRight: 8,
-                      width: '100%',
-                    },
-                    task_list_item_checkbox: {
-                      width: 20,
-                      height: 20,
-                      borderRadius: 4,
-                      borderWidth: 2,
-                      borderColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      marginRight: 12,
-                      marginTop: 2,
-                    },
-                    task_list_item_checked: {
-                      backgroundColor: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                    },
-                    link: {
-                      color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      textDecorationLine: 'underline',
-                      fontWeight: '500',
-                    },
-                    hr: {
-                      backgroundColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                      height: 1,
-                      marginVertical: 20,
-                      borderRadius: 1,
-                    },
-                    paragraph: {
-                      marginVertical: 12,
-                      fontSize: 16,
-                      lineHeight: 24,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                      color: colors.text,
-                    },
-                    details: {
-                      marginVertical: 12,
-                      padding: 12,
-                      backgroundColor: colors.background === '#fff' ? '#f8f9fa' : '#1a1a1a',
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: colors.background === '#fff' ? '#e0e0e0' : '#404040',
-                    },
-                    details_summary: {
-                      fontWeight: '600',
-                      color: colors.background === '#fff' ? '#0066CC' : '#66B3FF',
-                      marginBottom: 8,
-                    },
-                    image: {
-                      borderRadius: 8,
-                      marginVertical: 12,
-                    },
-                    table: { 
-                      marginVertical: 40,
-                      borderWidth: 1,
-                      borderColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                      borderRadius: 20,
-                      overflow: 'hidden',
-                      backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
-                      ...Platform.select({
-                        ios: {
-                          shadowColor: colors.background === '#fff' ? '#000' : '#fff',
-                          shadowOffset: { width: 0, height: 16 },
-                          shadowOpacity: 0.08,
-                          shadowRadius: 32,
-                        },
-                        android: {
-                          elevation: 8,
-                        },
-                      }),
-                    },
-                    thead: {
-                      backgroundColor: colors.background === '#fff' 
-                        ? '#fafafa'
-                        : '#1f1f1f',
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                    },
-                    th: { 
-                      color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
-                      fontWeight: '600',
-                      fontSize: 14,
-                      padding: 28,
-                      paddingVertical: 24,
-                      borderRightWidth: 0,
-                      backgroundColor: 'transparent',
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
-                      textAlign: 'left',
-                      letterSpacing: 0.2,
-                      textTransform: 'uppercase',
-                    },
-                    th_first: {
-                      paddingLeft: 32,
-                    },
-                    th_last: {
-                      paddingRight: 32,
-                    },
-                    tr: { 
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.background === '#fff' ? '#e8e8e8' : 'rgba(255, 255, 255, 0.08)',
-                      backgroundColor: 'transparent',
-                    },
-                    tr_last: {
-                      borderBottomWidth: 0,
-                    },
-                    tr_even: {
-                      backgroundColor: colors.background === '#fff' 
-                        ? '#fafafa'
-                        : '#1f1f1f',
-                    },
-                    tr_odd: {
-                      backgroundColor: colors.background === '#fff'
-                        ? '#ffffff'
-                        : '#1a1a1a',
-                    },
-                    tr_hover: {
-                      backgroundColor: colors.background === '#fff'
-                        ? '#f5f5f5'
-                        : '#252525',
-                    },
-                    td: { 
-                      color: colors.text,
-                      padding: 28,
-                      paddingVertical: 24,
-                      fontSize: 15,
-                      backgroundColor: 'transparent',
-                      borderRightWidth: 0,
-                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
-                      lineHeight: 24,
-                      letterSpacing: 0.1,
-                    },
-                    td_first: {
-                      fontWeight: '500',
-                      paddingLeft: 32,
-                      color: colors.background === '#fff' ? '#1a1a1a' : '#ffffff',
-                    },
-                    td_last: {
-                      paddingRight: 32,
-                    },
-                    table_wrapper: {
-                      marginHorizontal: -16,
-                      paddingHorizontal: 16,
-                    },
-                    table_container: {
-                      backgroundColor: colors.background === '#fff' ? '#ffffff' : '#1a1a1a',
-                      padding: 24,
-                      borderRadius: 24,
-                      marginVertical: 16,
-                    },
-                  }}
-                  rules={solidBulletRule}
-                >
-                  {item.text}
-                </Markdown>
-                {/* Icon row below message (only for bot messages and not while streaming) */}
-                {!isLastBotMessage && item.text !== "thinking" && (
-                  <View style={styles.actionIconsContainer}>
-                    {/* Copy Icon */}
-                    <Pressable
-                      onPress={() => handleCopy(item.text)}
-                      style={({ pressed }) => ([
-                        styles.actionIcon,
-                        pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
-                      ])}
-                    >
-                      <Ionicons name="copy-outline" size={18} color={colors.text} />
-                    </Pressable>
-                    {/* Retry Icon (only for bot messages) */}
-                    {!item.text.startsWith('Error:') && (
-                      <Pressable
-                        onPress={() => handleRetry(item)}
-                        style={({ pressed }) => ([
-                          styles.actionIcon,
-                          pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
-                        ])}
-                      >
-                        <Ionicons name="refresh-outline" size={18} color={colors.text} />
-                      </Pressable>
-                    )}
-                    {/* Text-to-Speech Icon */}
-                    <Pressable
-                      onPress={() => handleSpeak(item.text, item.id)}
-                      style={({ pressed }) => ([
-                        styles.actionIcon,
-                        pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
-                      ])}
-                    >
-                      <Ionicons 
-                        name={speakingMessageId === item.id ? "stop-circle-outline" : "volume-high-outline"} 
-                        size={18} 
-                        color={colors.text} 
-                      />
-                    </Pressable>
-                  </View>
-                )}
-              </View>
-            )}
-          </>
-        )}
-      </View>
-    );
-  };
-
   const scrollToBottom = () => {
     if (flatListRef.current) {
       flatListRef.current.scrollToEnd({ animated: true });
     }
   };
-
-  // Add useEffect to scroll when messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom();
-    }
-  }, [messages, isStreaming]);
 
   // Load chats from storage on mount
   const loadChats = async () => {
@@ -2010,6 +1409,161 @@ function AppContent() {
     initializeChats();
   }, []);
 
+  // Add useEffect to scroll when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages, isStreaming]);
+
+  // Cleanup audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (currentSound) {
+        currentSound.stopAsync();
+        currentSound.unloadAsync();
+      }
+      Speech.stop();
+    };
+  }, [currentSound]);
+
+  const renderMessage = ({ item, index }: { item: Message, index: number }) => {
+    // Determine if this is the last message and is currently streaming
+    const isLastBotMessage =
+      !item.isUser &&
+      index === messages.length - 1 &&
+      isStreaming &&
+      item.id.startsWith('streaming-');
+
+    return (
+      <View style={[
+        styles.messageContainer,
+        item.isUser ? { alignSelf: 'flex-end' } : styles.botMessage,
+      ]}>
+        {item.isUser ? (
+          <>
+            <TouchableOpacity 
+              style={[
+                styles.userMessage,
+                { backgroundColor: colors.inputBackground }
+              ]}
+              onPress={() => {
+                if (showCopyForMessageId === item.id) {
+                  setShowCopyForMessageId(null);
+                } else {
+                  setShowCopyForMessageId(item.id);
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Markdown
+                style={{
+                  body: {
+                    color: item.text.startsWith('Error:') ? '#d32f2f' : colors.text,
+                    fontSize: 16,
+                    lineHeight: 24,
+                    fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                    paddingRight: 0,
+                    paddingLeft: 0,
+                  },
+                }}
+                rules={solidBulletRule}
+              >
+                {item.text}
+              </Markdown>
+            </TouchableOpacity>
+            {/* Copy Icon for User Messages - Only show when message is touched */}
+            {showCopyForMessageId === item.id && (
+              <View style={[styles.actionIconsContainer, { justifyContent: 'flex-end' }]}>
+                <Pressable
+                  onPress={() => {
+                    handleCopy(item.text);
+                    setShowCopyForMessageId(null); // Hide after copying
+                  }}
+                  style={({ pressed }) => ([
+                    styles.actionIcon,
+                    pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                  ])}
+                >
+                  <Ionicons name="copy-outline" size={18} color={colors.text} />
+                </Pressable>
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            {item.text === "thinking" ? (
+              <ThinkingText />
+            ) : (
+              <View style={styles.botMessageContent}>
+                <Markdown
+                  style={{
+                    body: {
+                      color: item.text.startsWith('Error:') ? '#d32f2f' : colors.text,
+                      fontSize: 16,
+                      lineHeight: 24,
+                      fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+                      paddingRight: 0,
+                      paddingLeft: 0,
+                    },
+                  }}
+                  rules={solidBulletRule}
+                >
+                  {item.text}
+                </Markdown>
+                {/* Icon row below message (only for bot messages and not while streaming) */}
+                {!isLastBotMessage && item.text !== "thinking" && (
+                  <View style={styles.actionIconsContainer}>
+                    {/* Copy Icon */}
+                    <Pressable
+                      onPress={() => handleCopy(item.text)}
+                      style={({ pressed }) => ([
+                        styles.actionIcon,
+                        pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                      ])}
+                    >
+                      <Ionicons name="copy-outline" size={18} color={colors.text} />
+                    </Pressable>
+                    {/* Retry Icon (only for bot messages) */}
+                    {!item.text.startsWith('Error:') && (
+                      <Pressable
+                        onPress={() => handleRetry(item)}
+                        style={({ pressed }) => ([
+                          styles.actionIcon,
+                          pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                        ])}
+                      >
+                        <Ionicons name="refresh-outline" size={18} color={colors.text} />
+                      </Pressable>
+                    )}
+                                         {/* Text-to-Speech Icon */}
+                     <Pressable
+                       onPress={() => handleSpeak(item.text, item.id)}
+                       style={({ pressed }) => ([
+                         styles.actionIcon,
+                         pressed ? { opacity: 0.7, transform: [{ scale: 0.85 }] } : { opacity: 1, transform: [{ scale: 1 }] }
+                       ])}
+                     >
+                       {loadingTTSMessageId === item.id ? (
+                         <LoadingDot color={colors.text} />
+                       ) : (
+                         <Ionicons 
+                           name={speakingMessageId === item.id ? "stop-circle-outline" : "volume-high-outline"} 
+                           size={18} 
+                           color={colors.text} 
+                         />
+                       )}
+                     </Pressable>
+                  </View>
+                )}
+              </View>
+            )}
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <>
       <MenuPanel 
@@ -2073,7 +1627,7 @@ function AppContent() {
                     <FlatList
                       ref={flatListRef}
                       data={messages}
-                      renderItem={({ item, index }) => renderMessage({ item, index })}
+                      renderItem={renderMessage}
                       keyExtractor={item => item.id}
                       keyboardDismissMode="on-drag"
                       contentContainerStyle={{
@@ -2454,5 +2008,16 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginHorizontal: 2,
+  },
+  loadingSpinner: {
+    width: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spinnerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 });
