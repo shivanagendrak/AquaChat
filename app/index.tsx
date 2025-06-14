@@ -467,16 +467,58 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
           {/* Footer section */}
           <View style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 16, backgroundColor: colors.background }}>
             <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 4, paddingVertical: 6 }}
+              style={{ 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                marginBottom: 4, 
+                paddingVertical: 6,
+                paddingHorizontal: 8
+              }}
               onPress={handleDeleteAllChats}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#d32f2f', fontWeight: '700', fontSize: 17, textAlign: 'center' }}>{t('deleteAllChats')} </Text>
-                <Text style={{ color: colors.placeholderText, fontWeight: '500', fontSize: 15, textAlign: 'center' }}>{storageSize}</Text>
+              <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                <Text 
+                  style={{ 
+                    color: '#d32f2f', 
+                    fontWeight: '700', 
+                    fontSize: 17, 
+                    textAlign: 'center',
+                    flexShrink: 1
+                  }}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.8}
+                >
+                  {t('deleteAllChats')}
+                </Text>
+                <Text 
+                  style={{ 
+                    color: colors.placeholderText, 
+                    fontWeight: '500', 
+                    fontSize: 14, 
+                    textAlign: 'center',
+                    marginTop: 2
+                  }}
+                >
+                  {storageSize}
+                </Text>
               </View>
             </TouchableOpacity>
             {storageBytes > 5 * 1024 * 1024 * 1024 && (
-              <Text style={{ color: '#d32f2f', fontSize: 14, marginBottom: 12, marginTop: 2 }}>
+              <Text 
+                style={{ 
+                  color: '#d32f2f', 
+                  fontSize: 14, 
+                  marginBottom: 12, 
+                  marginTop: 2,
+                  textAlign: 'center',
+                  paddingHorizontal: 8,
+                  lineHeight: 20
+                }}
+                numberOfLines={3}
+                adjustsFontSizeToFit={true}
+                minimumFontScale={0.85}
+              >
                 {t('deleteAllChatsWarning')}
               </Text>
             )}
@@ -494,9 +536,15 @@ const MenuPanel = ({ isOpen, onClose, slideAnim, chats, currentChatId, onSwitchC
               }}
               onPress={handleLanguagePress}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
                 <Ionicons name="language-outline" size={20} color={colors.text} style={{ marginRight: 8 }} />
-                <Text style={{ color: colors.text, fontSize: 15 }}>{t('appLanguage')}</Text>
+                <Text 
+                  style={{ color: colors.text, fontSize: 15, flexShrink: 1 }}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {t('appLanguage')}
+                </Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={{ color: colors.placeholderText, fontSize: 14, marginRight: 4 }}>{language.toUpperCase()}</Text>
