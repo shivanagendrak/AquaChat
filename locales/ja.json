@@ -19,5 +19,7 @@
   "continue": "続ける",
   "chooseLanguage": "希望の\n言語を選択",
   "chooseLanguageSubtitle": "言語を選択して、水産養殖に関する質問に即座に回答を得ることができます。",
-  "appLanguage": "アプリの言語"
+  "appLanguage": "アプリの言語",
+  "noChats": "保存されたチャットはありません",
+  "noChatsFound": "チャットが見つかりません"
 } 

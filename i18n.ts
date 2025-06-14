@@ -31,6 +31,8 @@ export interface TranslationSchema {
   continue: string;
   chooseLanguage: string;
   chooseLanguageSubtitle: string;
+  noChats: string;
+  noChatsFound: string;
 }
 
 // Create a type-safe translation function

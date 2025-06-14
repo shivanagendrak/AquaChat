@@ -19,5 +19,7 @@
   "continue": "Continue",
   "chooseLanguage": "Choose Your\nPreferred Language",
   "chooseLanguageSubtitle": "Choose a language to start chatting and get instant answers to your aquaculture questions.",
-  "appLanguage": "App Language"
+  "appLanguage": "App Language",
+  "noChats": "No chats saved",
+  "noChatsFound": "No chats found"
 } 

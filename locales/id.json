@@ -19,5 +19,7 @@
   "continue": "Lanjutkan",
   "chooseLanguage": "Pilih Bahasa\nPilihan Anda",
   "chooseLanguageSubtitle": "Pilih bahasa untuk mulai mengobrol dan mendapatkan jawaban instan untuk pertanyaan akuakultur Anda.",
-  "appLanguage": "Bahasa Aplikasi"
+  "appLanguage": "Bahasa Aplikasi",
+  "noChats": "Tidak ada chat tersimpan",
+  "noChatsFound": "Tidak ada chat ditemukan"
 } 
